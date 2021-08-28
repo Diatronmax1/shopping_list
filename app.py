@@ -6,6 +6,7 @@ class MainWidget(QtWidgets.QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setWindowTitle('Shopping List Creator')
         self.button_group = QtWidgets.QButtonGroup()
         self.button_group.setExclusive(False)
         sunday_check = QtWidgets.QCheckBox('Sunday')
@@ -59,6 +60,5 @@ class ShoppingList(QtWidgets.QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Shopping List')
         self.main_widget = MainWidget()
         self.setCentralWidget(self.main_widget)
