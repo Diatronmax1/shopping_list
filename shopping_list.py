@@ -1,11 +1,15 @@
 import copy
-import gspread
+import math
 import os
-import pandas as pd
 import sys
-from oauth2client.service_account import ServiceAccountCredentials
 
-def build_frames(worksheet):
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
+
+RESULTS = []
+
+def build_frames(worksheet, used_days):
     """Creates data frames by days for a worksheet.
     
     Parameters
@@ -27,11 +31,13 @@ def build_frames(worksheet):
         'saturday',
     )
     days = {}
+    use_all = any(used_days)
     for sheet in worksheet:
         name = sheet.title.lower()
         if name in week_days:
-            data = sheet.get_all_values()
-            days[name] = pd.DataFrame(data)
+            if used_days.get(name) or use_all:
+                data = sheet.get_all_values()
+                days[name] = pd.DataFrame(data)
     return days
 
 class ChosenItem():
@@ -101,6 +107,8 @@ class ChosenItem():
         float
             Number of grams for this item.
         """
+        if self.gram_per_serv is None:
+            return
         start_grams = self.grams
         if self.servings and self.gram_per_serv:
             start_grams += self.serving * self.gram_per_serv
@@ -133,7 +141,7 @@ def extract_list(day_dicts):
                     unit_type = series[2]
                     gram_weight = series[12]
                 except Exception as e:
-                    print(e)
+                    RESULTS.append(f'Failed to retrive values {e}')
                     continue
                 if name in ignored_rows:
                     continue
@@ -150,16 +158,16 @@ def extract_list(day_dicts):
                         try:
                             gram_weight = float(gram_weight)
                         except Exception as e:
-                            print(e)
+                            RESULTS.append(f'Failed to convert {name} gram_weight {gram_weight}')
                             continue
                         print(qty, gram_weight)
                         item.add_grams(qty, gram_weight)
                     elif unit_type == 'servings':
                         item.add_servings(qty)
                     else:
-                        print('Unrecognized unit_type', unit_type)
+                        RESULTS.append(f'Unrecognized unit_type {unit_type} for {name}')
                         continue
-    return items
+    return items 
 
 class Food():
     def __init__(self, name, serving_qty, serving_unit):
@@ -168,8 +176,8 @@ class Food():
         self.serving_unit = serving_unit
 
     def __str__(self):
-        return '{0},\t {1} {2}'.format(self.name, self.serving_qty, self.serving_unit)
-
+        return f'{self.serving_qty} {self.serving_unit} {self.name}'
+   
     def __lt__(self, other):
         return self.name < other.name
 
@@ -193,13 +201,17 @@ class Recipe():
     ----------
     name : str
         Name of the recipe.
+    servs_per_rec : float
+        How much a single serving constitues a recipe. I.e
+        0.125 means 8 servings is a full recipe.
     ingredients : list
         List of food objects.
     
     """
 
-    def __init__(self, name, ingredients=None):
+    def __init__(self, name, servs_per_rec, ingredients=None):
         self.name = name
+        self.servs_per_rec = servs_per_rec
         self.ingredients = []
         if ingredients:
             self.ingredients = ingredients
@@ -238,14 +250,22 @@ def load_recipes(recipe_df, raw_df):
                 recipes[recipe_name] = cur_recipe
             recipe_series = recipe_df.iloc[idx+1]
             recipe_name = recipe_series[0]
-            cur_recipe = Recipe(recipe_name)
+            servs_per_rec = float(recipe_series[6])
+            cur_recipe = Recipe(recipe_name, servs_per_rec)
         if start_track:
             if first_col:
                 raw_ing_series = raw_df.loc[first_col]
                 ing_name = raw_ing_series['Name']
-                serv_qty = float(raw_ing_series['Serving Qty'])
+                try:
+                    serv_qty = float(raw_ing_series['Serving Qty'])
+                    #Grab the qty from the recipe.
+                    serv_amt = float(series[8])
+                except Exception as exc:
+                    RESULTS.append(f'Failed on {ing_name} {exc}')
+                    continue
                 serv_unit = raw_ing_series['Serving Unit']
                 ingredient = Food(ing_name, serv_qty, serv_unit)
+                ingredient *= serv_amt
                 cur_recipe.append(ingredient)
         #So the next time in the loop we will look for ingredient names.
         if cur_recipe and first_col == 'Ingredients':
@@ -283,7 +303,7 @@ def load_food(wks):
             raw_df = pd.DataFrame(data, columns=header)
             raw_df = raw_df.set_index(raw_df['Name'])
     if master_df is None or recipe_df is None or raw_df is None:
-        print('Missing a data frame to load food', type(master_df), type(recipe_df), type(raw_df))
+        RESULTS.append(f'Missing a data frame to load food {type(master_df)}, {type(recipe_df)}, {type(raw_df)}')
         return None, {}
     recipes = load_recipes(recipe_df, raw_df)
     return master_df, recipes
@@ -294,10 +314,14 @@ def create_shopping_list(items, master_df, recipes):
         #Get the item to add to the shopping list if in recipes.
         recipe = recipes.get(name)
         ts = chosen_item.total_servings()
+        tg = chosen_item.total_grams()
         if recipe:
+            #The total servings need to be reduced by
+            #the recipe ratio.
+            total_recipes = math.ceil(ts*recipe.servs_per_rec)
             for recipe_item in recipe.ingredients:
                 new_food = copy.copy(recipe_item)
-                new_food *= ts
+                new_food *= total_recipes
                 if recipe_item.name not in shopping_list:
                     shopping_list[recipe_item.name] = new_food
                 else:
@@ -305,8 +329,20 @@ def create_shopping_list(items, master_df, recipes):
         else:
             master_series = master_df.loc[name]
             new_food_name = master_series[0]
-            new_food_qty = float(master_series[4])
             new_food_unit = master_series[5]
+            try:
+                new_food_qty = float(master_series[4])
+            except Exception as e1:
+                msg = f'Failed to convert {name} {master_series[4]} qty {e1}'
+                if tg is None:
+                    RESULTS.append(msg)
+                    continue
+                try:
+                    new_food_grams = float(master_series[6])
+                    new_food_qty = new_food_grams/tg
+                except Exception as e2:
+                    RESULTS.append(f'{msg} {e2}')
+                    continue
             new_food = Food(new_food_name, new_food_qty, new_food_unit)
             new_food *= ts
             if name not in shopping_list:
@@ -315,7 +351,7 @@ def create_shopping_list(items, master_df, recipes):
                 shopping_list[name] += new_food
     return shopping_list
 
-def main(output_file='test.txt'):
+def main(used_days, output_file='shopping_list.txt'):
     """Retrieves data from a google spreadsheet and 
     creates a shopping list from it.
 
@@ -331,6 +367,7 @@ def main(output_file='test.txt'):
     bool
         Whether or not the operation succeeded.
     """
+    RESULTS.clear()
     scope = ['https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive']
     credentials = ServiceAccountCredentials.from_json_keyfile_name(
@@ -339,8 +376,8 @@ def main(output_file='test.txt'):
     c_plan = gc.open("Chris Food Plan")
     m_plan = gc.open("Melia's Food Plan")
     master = gc.open('Food List')
-    c_dict = build_frames(c_plan)
-    m_dict = build_frames(m_plan)
+    c_dict = build_frames(c_plan, used_days)
+    m_dict = build_frames(m_plan, used_days)
     items = extract_list((c_dict, m_dict))
     master_df, recipes = load_food(master)
     shopping_list = create_shopping_list(items, master_df, recipes)
@@ -348,11 +385,14 @@ def main(output_file='test.txt'):
     shopping_list.sort()
     with open(output_file, 'w+') as s_file:
         for item in shopping_list:
-            s_file.write(str(item) + '\n')
+            s_file.write(f'{item}\n')
+    RESULTS.append('File Created')
+    return RESULTS
 
 if __name__ == '__main__':
     f_name = 'shopping_list.txt'
     if len(sys.argv) > 1:
         f_name, _ = os.path.splitext(sys.argv[1])
         f_name += '.txt'
-    main(f_name)
+    print('Creating file', f_name)
+    main({}, f_name)
