@@ -386,7 +386,7 @@ def main(used_days, output_file='shopping_list.txt'):
     with open(output_file, 'w+') as s_file:
         for item in shopping_list:
             s_file.write(f'{item}\n')
-    RESULTS.append('File Created')
+    RESULTS.append(f'File Created {output_file}')
     return RESULTS
 
 if __name__ == '__main__':

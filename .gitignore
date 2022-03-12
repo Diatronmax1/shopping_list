@@ -2,3 +2,4 @@ x-pulsar-314603-93596a655165.json
 __pycache__
 *.pyc
 *.txt
+.vscode/

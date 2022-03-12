@@ -1,63 +1,96 @@
-from PyQt5 import QtWidgets
-import shopping_list
+"""
+Main application window to create shopping lists from.
+"""
 import os
+from pathlib import Path
 
-class MainWidget(QtWidgets.QWidget):
+from PyQt5.QtWidgets import (
+    QButtonGroup,
+    QCheckBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QTextEdit,
+    QWidget,
+)
+
+import shopping_list
+
+class MainWidget(QWidget):
+    """
+    Primary application entry point.
+
+    Parameters
+    ----------
+    parent : QObject, optional, default=None
+        A parent object, but not neccesary.
+
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle('Shopping List Creator')
-        self.button_group = QtWidgets.QButtonGroup()
+        #Checkable days.
+        days = ('Sunday',
+            'Monday',
+            'Tuesday',
+            'Wednesday',
+            'Thursday',
+            'Friday',
+            'Saturday')
+        self.button_group = QButtonGroup()
         self.button_group.setExclusive(False)
-        sunday_check = QtWidgets.QCheckBox('Sunday')
-        monday_check = QtWidgets.QCheckBox('Monday')
-        tuesday_check = QtWidgets.QCheckBox('Tuesday')
-        wednesday_check = QtWidgets.QCheckBox('Wednesday')
-        thursday_check = QtWidgets.QCheckBox('Thursday')
-        friday_check = QtWidgets.QCheckBox('Friday')
-        saturday_check = QtWidgets.QCheckBox('Saturday')
-        self.file_name = QtWidgets.QLineEdit()
+        for day in days:
+            new_day = QCheckBox(day, self)
+            self.button_group.addButton(new_day)
+        #Name of the file.
+        self.file_name = QLineEdit()
         self.file_name.setText('shopping_list')
-        self.generate_list_but = QtWidgets.QPushButton('Generate List')
-        self.button_group.addButton(sunday_check)
-        self.button_group.addButton(monday_check)
-        self.button_group.addButton(tuesday_check)
-        self.button_group.addButton(wednesday_check)
-        self.button_group.addButton(thursday_check)
-        self.button_group.addButton(friday_check)
-        self.button_group.addButton(saturday_check)
-        self.status = QtWidgets.QTextEdit()
+        #Output directory.
+        def_path = Path.home() / 'Desktop'
+        self.output_dir = QLineEdit()
+        self.output_dir.setText(str(def_path))
+        self.status = QTextEdit()
+        self.generate_list_but = QPushButton('Generate List')
         #Signals
         self.generate_list_but.clicked.connect(self.make_shopping_list)
         #Layout
-        days = QtWidgets.QGroupBox('Days')
-        layout = QtWidgets.QHBoxLayout(days)
+        day_group = QGroupBox('Days')
+        layout = QHBoxLayout(day_group)
         for button in self.button_group.buttons():
             button.setChecked(True)
             layout.addWidget(button)
-        name_line = QtWidgets.QWidget()
-        layout = QtWidgets.QHBoxLayout(name_line)
-        layout.addWidget(self.file_name)
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(days)
-        layout.addWidget(name_line)
-        layout.addWidget(QtWidgets.QLabel('Status'))
-        layout.addWidget(self.status)
+        layout = QFormLayout(self)
+        layout.addRow('Select Days', day_group)
+        layout.addRow('FileName', self.file_name)
+        layout.addRow('Output Directory', self.output_dir)
+        layout.addRow('Status', self.status)
         layout.addWidget(self.generate_list_but)
 
     def make_shopping_list(self):
+        """
+        Builds the shopping list when geenrate is chosen.
+        """
         days = {}
         for button in self.button_group.buttons():
             days[button.text().lower()] = button.isChecked()
         file_name = os.path.splitext(self.file_name.text())[0] + '.txt'
-        results = shopping_list.main(days, file_name)
-        text = ''
-        for result in results:
-            text += result + '\n'
+        out_dir = Path(self.output_dir.text())
+        out_file = out_dir / file_name
+        if not out_dir.exists():
+            self.status.setText(f'Output dir does not exist! {out_dir}')
+            return
+        results = shopping_list.main(days, out_file)
+        text = '\n'.join(results)
         self.status.setText(text)
 
-class ShoppingList(QtWidgets.QMainWindow):
-
+class ShoppingList(QMainWindow):
+    """
+    Primary entry point.
+    """
     def __init__(self):
         super().__init__()
         self.main_widget = MainWidget()
