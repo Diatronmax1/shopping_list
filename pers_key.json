@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "x-pulsar-314603",
+  "private_key_id": "93596a655165bb04e351d27c1732da98ddb8baea",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCwml5465ODZgdU\nDNqWdh4ZCz+pDoRbTSn0MZ5QonciZMAQdoPnrDM3SN7dHFEi1CjIxFH1n3btHmIs\nU+ADAWmEDLdyC4EoRyAQhqWBxksi1OZspROpj8GZ2UKspUclTs+qunChZA/8R/TQ\ntEyPwys9DzqNMiwEyGySCmROiaQmL2NdvPeUxxx8r+xaXHwLdxjxFvYkK1nKRkcM\nfS5+kNMrmuHNxr2MdZfkFquiFJtxU6jfoxOKQ/3a3iDfI/2NzrN2I0PRFmHqWDJX\nQ5CgCdh080tLzzvkyOqqB8cBhRj++eryE+sgC4vvH4dIp8YcsQEyMSDfFrO8soEl\n7tkyGqETAgMBAAECggEAA63GvgbnDo7d8QN7iJrZS0HcVG2eMDca4qCN+oJuSbC5\n/eqaGmwp41yI1/Sypy97a5zU7QrvWhOOwMgJtV/rWy09cD2Ktgeu3hx2VVruG1s+\nZl3IW3kVJvR+dESh7ZMHHGvAOnxwVAI9Uh1Cljp4khyl5mV4wt8lJwp0YHZzJu0/\nPyjnNwNMJhbYPp+enDFP327oMMcucjp5WGFMJIDB2QxwgpMsIFLSsH7FHGv9eSAb\nE+PzEA0MUeCjKtuO15AQoxpf6w+6hQKLcC0br7bM3yt5dmn8QLpP7uZHf2HgLW8H\nlPoEVGd30yHUR08YumusGBfCgXrbgZB9bgSCtFRo0QKBgQDzMlBN+fA7aalnxGeu\n6JCrTfhq0IGD0DxPkwCAIg9VkC7rRYCLJr4vwS6t6iwMbdck6kdBw5DkRGeAYuGg\nM8vRqlEiFWCjzrNlEqMCKShYaDjitYA5cqtkoag4VMcElmYbvV+A5Pbfry/raUPi\nQ4wVpNOV6601Z0VakZSD+Td43wKBgQC55oolKFtsoMDGBFFHbvjeKI+mnRA3XzOG\nlBGymWSfPy8QmDw9Svxfo2uNgkv2iiDkt/XH4AgDgxT/Ft0C1Sc5HFbHOungUqZK\n/sSV9gCEtK39H2Ai3X6vIm+cA7fvyM95i90Miu0tEyV/6A7mVsgKH86d2GD7l4Iw\n/D/LgE96TQKBgGLyDYosLnl9u9bkKesX5ARObMvImWkvx9n4TTPUp7iAORav6GS1\nFpwHVR6dL96+sdHrH6K6FrFIw3OQx4uOh1Z+nRPo7rC24HY25utyI2AUx1A12D2H\nUgRXYUHJ/E75ggG3QqwGfAr2E+ELqvrb0JrdvNg6UvZvVeBLaslnFBKxAoGAEYnd\niKnpDjOQXF416N5gXl1HSDnTONYjf1Pi442zP47vespSDJpRexho4j3jusvHVKzC\nZGwPdX1dcr+OdGD1xV6WFU/Klt5VUAf/NgKyg9KkA5h9MmzhMda23uo+5UF1yYrX\nfQJyY+lFhW64USTo1IOxs5ShebsOjl6OCj39wZUCgYEAtWyISD4L/ug+1rdfYlb2\nK9rpI0Uxvh7qtT0xnbxRw+wo3gBa1DT8q5qfSFzQTIkFqJLW3Oxo/i2mz+wlAE1o\ncFcGSIbvVmxzLxw5XCVHh6sJQpvf3rSlJGeR8ISVHP3e0eVIhTpSNplT9AkJEojd\n8szq7D7hrVVMFRAlc0wg8yE=\n-----END PRIVATE KEY-----\n",
+  "client_email": "shoppinglist@x-pulsar-314603.iam.gserviceaccount.com",
+  "client_id": "101755409756834295771",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/shoppinglist%40x-pulsar-314603.iam.gserviceaccount.com"
+}
