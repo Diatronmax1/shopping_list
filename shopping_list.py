@@ -412,10 +412,20 @@ def main(used_days, output_file='shopping_list.txt', string_io=None, already_hav
     today = dt.date.today()
     with open(output_file, 'w+', encoding='utf-8') as s_file:
         first_line = ''
+        second_line = ''
         for day_num in range(7):
             day = today + dt.timedelta(days=day_num)
-            first_line += day.strftime('(%a - %m/%d)')
-        s_file.write(first_line + '\n\n')
+            end = ' '
+            if day_num == 6:
+                end = ''
+            day_block = f"{day.strftime('%A')}{end}"
+            first_line += day_block
+            date_block = day.strftime('%m/%d')
+            add_len = len(day_block) - len(date_block)
+            date_block += ' '*add_len
+            second_line += date_block
+        s_file.write(first_line + '\n')
+        s_file.write(second_line + '\n\n')
         for group_name, food_list in shopping_groups.items():
             s_file.write(group_name + '\n')
             s_file.write('-'*len(group_name) + '\n')

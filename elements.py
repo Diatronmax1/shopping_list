@@ -40,8 +40,12 @@ class Food():
         str
         """
         days = sorted(self.days)
-        short_days = ','.join([day.strftime('%a') for day in days])
-        return f'({short_days})'
+        fmt = '%a'
+        if self.food_type == 'Meat':
+            #Special case where displaying the date
+            #is more helpful.
+            fmt = '%m/%d'
+        return f"({','.join([day.strftime(fmt) for day in days])})"
 
     def __str__(self):
         unit = self.amount

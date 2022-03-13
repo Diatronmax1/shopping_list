@@ -172,10 +172,10 @@ class AlreadyHave(QDialog):
         for _ in range(self.main_layout.count()):
             layout_item = self.main_layout.takeAt(0)
             layout_item.widget().setParent(None)
-        self.main_layout.addWidget(self.checks, 0, 0, 2, 1)
-        self.main_layout.addWidget(self.create_new, 1, 1)
-        self.main_layout.addWidget(self.save_and_close, 2, 0)
-        self.main_layout.addWidget(self.cancel_but, 2, 1)
+        self.main_layout.addWidget(self.create_new,     0, 1)
+        self.main_layout.addWidget(self.checks,         1, 0, 2, 1)
+        self.main_layout.addWidget(self.cancel_but,     2, 0)
+        self.main_layout.addWidget(self.save_and_close, 2, 1)
 
     def new_check(self, name, val):
         """
