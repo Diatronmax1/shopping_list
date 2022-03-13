@@ -9,8 +9,12 @@ import math
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
+from pint import UnitRegistry
 
 from elements import ChosenItem, Food, Recipe
+
+UREG = UnitRegistry()
+UREG.load_definitions('unit_def.txt')
 
 def load_food_plan(worksheet, used_days):
     """
@@ -169,9 +173,13 @@ def load_recipes(recipe_df, raw_df):
                     logger.warning(msg)
                     continue
                 serv_unit = raw_ing_series['Serving Unit']
-                ingredient = Food(ing_name, serv_qty, serv_unit)
-                ingredient *= serv_amt
-                cur_recipe.append(ingredient)
+                amount = serv_qty * UREG(serv_unit)
+                #Grab the preferred unit from the recipe.
+                rec_unit = series[2]
+                food_type = raw_ing_series['Food Type']
+                new_food = Food(ing_name, amount, rec_unit, food_type)
+                new_food *= serv_amt
+                cur_recipe.append(new_food)
         #So the next time in the loop we will look for ingredient names.
         if cur_recipe and first_col == 'Ingredients':
             start_track = True
@@ -246,15 +254,11 @@ def create_shopping_list(items, master_df, recipes, already_have):
         already_have = set()
     logger = logging.getLogger(__name__)
     shopping_list = {}
-    for name, chosen_item in items.items():
+    for chosen_name, chosen_item in items.items():
         total_s = chosen_item.total_servings()
         total_g = chosen_item.total_grams()
-        if name.lower() in already_have:
-            msg = 'Assuming already have {total_s}/{total_g}(serv/g) of {name}'
-            logger.info(msg)
-            continue
         #Get the item to add to the shopping list if in recipes.
-        recipe = recipes.get(name)
+        recipe = recipes.get(chosen_name)
         if recipe:
             #If the number of items requested exceeds 1 recipe
             #round up so that 2 recipe amounts are ordered.
@@ -265,8 +269,7 @@ def create_shopping_list(items, master_df, recipes, already_have):
                 new_food *= total_recipes
                 ing_name = new_food.name.lower()
                 if ing_name in already_have:
-                    msg = f'Assuming already have {new_food.serving_qty}'
-                    msg += f' {new_food.serving_unit} of {ing_name}'
+                    msg = f'Assuming already have {new_food.amount:.2f} of {ing_name}'
                     logger.info(msg)
                     continue
                 if ing.name not in shopping_list:
@@ -275,15 +278,16 @@ def create_shopping_list(items, master_df, recipes, already_have):
                     shopping_list[ing.name] += new_food
             continue
         #Find the item in the master list.
-        master_series = master_df.loc[name]
+        master_series = master_df.loc[chosen_name]
         new_food_name = master_series[0]
         new_qty_str = master_series[4]
         new_food_unit = master_series[5]
         new_grams_str = master_series[6]
+        new_food_type = master_series[11]
         try:
             new_food_qty = float(new_qty_str)
         except ValueError as exc1:
-            msg = f'Failed to convert {name} {new_qty_str} qty {exc1}'
+            msg = f'Failed to convert {new_food_name} {new_qty_str} qty {exc1}'
             if total_g is None or total_g == 0:
                 logger.warning(msg)
                 continue
@@ -294,15 +298,49 @@ def create_shopping_list(items, master_df, recipes, already_have):
                 msg = f'{msg} {exc2}'
                 logger.warning(msg)
                 continue
-        new_food = Food(new_food_name, new_food_qty, new_food_unit)
+        amount = new_food_qty * UREG(new_food_unit)
+        new_food = Food(new_food_name, amount, new_food_unit, new_food_type)
         #Update the days this food is needed.
         new_food.days |= chosen_item.days
         new_food *= total_s
-        if name not in shopping_list:
-            shopping_list[name] = new_food
+        if new_food.name.lower() in already_have:
+            msg = f'Assuming already have {new_food.amount:.2f} of {new_food.name}'
+            logger.info(msg)
+            continue
+        if new_food.name not in shopping_list:
+            shopping_list[new_food.name] = new_food
         else:
-            shopping_list[name] += new_food
+            shopping_list[new_food.name] += new_food
     return shopping_list
+
+def build_groups(shopping_list):
+    """
+    Takes a list of Food items and creates a dictionary
+    organized by food_type. Blank food types will be appended
+    to the end as a No Category.
+
+    Parameters
+    ----------
+    shopping_list : list
+        Input list of Food items.
+
+    Returns
+    -------
+    dict
+        Organized by group name (food type), and the food
+        items in that group.
+    """
+    groups = {}
+    no_group = []
+    for food_item in shopping_list:
+        if food_item.food_type == '':
+            no_group.append(food_item)
+            continue
+        if food_item.food_type not in groups:
+            groups[food_item.food_type] = []
+        groups[food_item.food_type].append(food_item)
+    groups['No Category'] = no_group
+    return groups
 
 def main(used_days, output_file='shopping_list.txt', string_io=None, already_have=None):
     """
@@ -370,9 +408,14 @@ def main(used_days, output_file='shopping_list.txt', string_io=None, already_hav
     shopping_list = create_shopping_list(food_by_day, master_df, recipes, already_have)
     shopping_list = list(shopping_list.values())
     shopping_list.sort()
+    shopping_groups = build_groups(shopping_list)
     with open(output_file, 'w+', encoding='utf-8') as s_file:
-        for item in shopping_list:
-            s_file.write(f'{item}\n')
+        for group_name, food_list in shopping_groups.items():
+            s_file.write(group_name + '\n')
+            s_file.write('-'*len(group_name) + '\n')
+            for food_item in food_list:
+                s_file.write(f'{food_item}\n')
+            s_file.write('\n')
     msg = f'File Created {output_file}'
     logger.info(msg)
 

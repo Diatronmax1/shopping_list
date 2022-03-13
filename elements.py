@@ -2,6 +2,10 @@
 Defines the portions of the online google
 with items that we want for the sheet.
 """
+
+from pint import DimensionalityError
+
+
 DAYS = {
     'sunday':0,
     'monday':1,
@@ -20,15 +24,21 @@ class Food():
     ----------
     name : str
         Name of the food.
-    serving_qty : float
-        Amount in a serving.
-    serving_unit : str
-        The units of the serving.
+    amount : pint.Unit
+        Unit from pint.
+    rec_unit : str
+        The unit if this came from a recipe. If
+        just created will be the string that
+        the amount was made from.
+    food_type : str
+        The type of food this is, used for categorizing
+        the shopping_list
     """
-    def __init__(self, name, serving_qty, serving_unit):
+    def __init__(self, name, amount, rec_unit, food_type):
         self.name = name
-        self.serving_qty = serving_qty
-        self.serving_unit = serving_unit
+        self.amount = amount
+        self.rec_unit = rec_unit
+        self.food_type = food_type
         self.days = set()
 
     def day_shortstr(self):
@@ -45,22 +55,25 @@ class Food():
         return f'({short_days})'
 
     def __str__(self):
-        msg = f'{self.serving_qty:.3f} {self.serving_unit} '
-        msg += f'{self.name} {self.day_shortstr()}'
-        return msg
+        unit = self.amount
+        try:
+            unit = self.amount.to(self.rec_unit)
+        except DimensionalityError:
+            pass
+        return f'{unit:.2f} {self.name} {self.day_shortstr()}'
 
     def __lt__(self, other):
         return self.name < other.name
 
     def __copy__(self):
-        return type(self)(self.name, self.serving_qty, self.serving_unit)
+        return type(self)(self.name, self.amount, self.rec_unit, self.food_type)
 
     def __iadd__(self, other):
-        self.serving_qty += other.serving_qty
+        self.amount += other.amount
         return self
 
     def __imul__(self, other):
-        self.serving_qty *= other
+        self.amount *= other
         return self
 
 class Recipe():
