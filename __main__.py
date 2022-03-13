@@ -27,6 +27,7 @@ def main(log_capture_string):
     main_app = QApplication(sys.argv)
     window = app.MainWidget(log_capture_string)
     window.show()
+    window.check_for_keyfile()
     return main_app.exec_()
 
 if __name__ == '__main__':

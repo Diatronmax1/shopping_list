@@ -339,6 +339,26 @@ class MainWidget(QMainWindow):
         self.setCentralWidget(widget)
         self.edit_already_haves()
 
+    def check_for_keyfile(self):
+        """
+        Validates there is a key to connect to sheets.
+
+        Raises
+        ------
+        FileNotFoundError
+            When the keyfile isn't setup correctly.
+        """
+        keyfile = Path('pers_key.json')
+        if not keyfile.exists():
+            key_text, ok_pressed = QInputDialog.getText(self,
+                'No Key File detected, create new',
+                'Key:')
+            if key_text and ok_pressed:
+                with open(keyfile, 'w') as k_file:
+                    k_file.write(key_text)
+        if not keyfile.exists():
+            raise FileNotFoundError('Must have a key file to continue!')
+
     def edit_already_haves(self):
         """
         Creates the widget to modify already haves.
