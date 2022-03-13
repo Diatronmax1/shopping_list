@@ -1,0 +1,14 @@
+packet = [packet] = _ = pac
+whole = [whole]
+clove = [clove] = _ = cloves
+bunch = [bunch] = _ = _
+slice = [slice] = _ = slices
+recipe = [recipe] = _ = _
+skewer = [skewer] = _ = _
+stick = [stick] = _ = sticks
+can = [can] = _ = _
+biscuit = [biscuit] = _ = biscuits
+sprig = [sprig] = _ = _
+link = [link] = _ = links
+package = [package] = _ = _
+bulb = [bulb] = _ = _
