@@ -2,6 +2,15 @@
 Defines the portions of the online google
 with items that we want for the sheet.
 """
+DAYS = {
+    'sunday':0,
+    'monday':1,
+    'tuesday':2,
+    'wednesday':3,
+    'thursday':4,
+    'friday':5,
+    'saturday':6
+    }
 
 class Food():
     """
@@ -20,9 +29,25 @@ class Food():
         self.name = name
         self.serving_qty = serving_qty
         self.serving_unit = serving_unit
+        self.days = set()
+
+    def day_shortstr(self):
+        """
+        Retrieves a modified short string version of the
+        days this food is required.
+
+        Returns
+        =======
+        str
+        """
+        days = sorted(list(self.days), key=DAYS.get)
+        short_days = ','.join([day[:2] for day in days])
+        return f'({short_days})'
 
     def __str__(self):
-        return f'{self.serving_qty} {self.serving_unit} {self.name}'
+        msg = f'{self.serving_qty:.3f} {self.serving_unit} '
+        msg += f'{self.name} {self.day_shortstr()}'
+        return msg
 
     def __lt__(self, other):
         return self.name < other.name
@@ -48,17 +73,17 @@ class Recipe():
     ----------
     name : str
         Name of the recipe.
-    servs_per_rec : float
-        How much a single serving constitues a recipe. I.e
-        0.125 means 8 servings is a full recipe.
+    rec_per_serv : float
+        How much of a recipe is in a serving, used
+        to determine full portions.
     ingredients : list, optional, default=None
         List of food objects.
 
     """
 
-    def __init__(self, name, servs_per_rec, ingredients=None):
+    def __init__(self, name, rec_per_serv, ingredients=None):
         self.name = name
-        self.servs_per_rec = servs_per_rec
+        self.rec_per_serv = rec_per_serv
         self.ingredients = []
         if ingredients:
             self.ingredients = ingredients

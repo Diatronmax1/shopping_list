@@ -1,17 +1,25 @@
 """
 Main application window to create shopping lists from.
 """
+from configparser import ConfigParser
 import os
 from pathlib import Path
 import time
 
 from PyQt5.QtWidgets import (
+    QAction,
     QButtonGroup,
     QCheckBox,
+    QDialog,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
+    QLabel,
     QLineEdit,
+    QMainWindow,
+    QMenu,
     QPushButton,
     QTextEdit,
     QWidget,
@@ -63,25 +71,208 @@ class ShoppingWorker(QObject):
         The path to the output file.
     string_io : io.StringIO
         String to monitor for changes.
-
+    already_have : set
+        A set of names that should be ignored.
     """
 
     finished = pyqtSignal()
 
-    def __init__(self, days, out_file, string_io):
+    def __init__(self, days, out_file, string_io, already_have):
         super().__init__()
         self.days = days
         self.out_file = out_file
         self.string_io = string_io
+        self.already_have = already_have
 
     def run(self):
         """
         Builds the shopping list on a thread.
         """
-        shopping_list.main(self.days, self.out_file, self.string_io)
+        shopping_list.main(
+            self.days, self.out_file, self.string_io, self.already_have)
         self.finished.emit()
 
-class MainWidget(QWidget):
+class HaveCheck(QCheckBox):
+    """
+    Subclassing the Checkbox to catch
+    the right click events.
+
+    """
+
+    new_name = pyqtSignal(QCheckBox, str)
+    remove_name = pyqtSignal(QCheckBox)
+
+    def contextMenuEvent(self, event):
+        """
+        Handles the right click scenario for check boxes
+
+        Parameters
+        ==========
+        event : QtGui.QContextMenuEvent
+            The event.
+        """
+        con_menu = QMenu(self)
+        new_name_act = con_menu.addAction("Change Name")
+        remove_act = con_menu.addAction("Delete")
+        action = con_menu.exec_(self.mapToGlobal(event.pos()))
+        if action == new_name_act:
+            text, ok_pressed = QInputDialog.getText(self,
+                'Enter new name',
+                'Name: ',)
+            if text and ok_pressed:
+                self.new_name.emit(self, text)
+        elif action == remove_act:
+            self.remove_name.emit(self)
+
+class AlreadyHave(QDialog):
+    """
+    Widget that allows manipulation of the underlying
+    ini file and can set and remove different names
+    to be ignored.
+    """
+
+    PATH = 'already_have.ini'
+    MAX_ROWS = 10
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Check boxes to modify values')
+        self.cfg = ConfigParser()
+        self.cfg.read(self.PATH)
+        self.save_and_close = QPushButton('Save and Close')
+        self.cancel_but = QPushButton('Cancel')
+        self.create_new = QPushButton('New')
+        self.create_new.clicked.connect(self.new_element)
+        self.save_and_close.clicked.connect(self.accept)
+        self.cancel_but.clicked.connect(self.reject)
+        #Checkboxes.
+        self.checks = QWidget()
+        self.check_layout = QGridLayout(self.checks)
+        for name in self.cfg['Names']:
+            val = self.cfg['Names'].getboolean(name)
+            self.new_check(name, val)
+        #Main Layout
+        self.main_layout = QGridLayout(self)
+        self.resize(400,400)
+        self.refresh_layout()
+
+    def refresh_layout(self):
+        """
+        Clears the main layout and rebuilds it.
+        """
+        for _ in range(self.main_layout.count()):
+            layout_item = self.main_layout.takeAt(0)
+            layout_item.widget().setParent(None)
+        self.main_layout.addWidget(self.checks, 0, 0, 2, 1)
+        self.main_layout.addWidget(self.create_new, 1, 1)
+        self.main_layout.addWidget(self.save_and_close, 2, 0)
+        self.main_layout.addWidget(self.cancel_but, 2, 1)
+
+    def new_check(self, name, val):
+        """
+        Convenience method to add a new check box.
+
+        Parameters
+        ----------
+        name : str
+            Name of the new checkbox.
+        val : bool
+            Representing the state of the checkbox.
+        """
+        name_check = HaveCheck(name)
+        name_check.setChecked(val)
+        func = lambda:self.name_change(name, name_check.isChecked())
+        name_check.clicked.connect(func)
+        name_check.new_name.connect(self.modify_name)
+        name_check.remove_name.connect(self.remove_name)
+        #Compute what row and col this should be added to based on
+        #the number of items in the layout.
+        num_items = self.check_layout.count()
+        row = num_items % self.MAX_ROWS
+        col = num_items // self.MAX_ROWS
+        self.check_layout.addWidget(name_check, row, col)
+
+    def new_element(self):
+        """
+        Creates a widget to request the new name
+        and modifies the layout to include the new checkbox.
+        """
+        text, ok_pressed = QInputDialog.getText(
+            self,
+            'Provide a name',
+            'Name:')
+        if text and ok_pressed:
+            self.new_check(text, True)
+            self.name_change(text, True)
+        self.refresh_layout()
+
+    def modify_name(self, widget, new_name):
+        """
+        Updates the name in the dictionary to the new
+        one preserving the state.
+
+        Parameters
+        ----------
+        widget : HaveCheck
+            The widget to eliminate and replace.
+        new_name : str
+            The new name for the dictionary.
+        """
+        self.cfg['Names'].pop(widget.text())
+        self.take_check(widget)
+        self.new_check(new_name, widget.isChecked())
+        self.name_change(new_name, widget.isChecked())
+        self.refresh_layout()
+
+    def take_check(self, widget):
+        """
+        Convenience method to handle removing a widget
+        from a layout consistently.
+
+        Parameters
+        ----------
+        widget : QWidget
+            The widget to remove from the check layout.
+        """
+        idx = self.check_layout.indexOf(widget)
+        self.check_layout.takeAt(idx)
+        widget.setParent(None)
+
+    def remove_name(self, widget):
+        """
+        Removes a name from config.
+
+        Parameters
+        ----------
+        widget : HaveCheck
+            The widget to delete.
+        """
+        self.cfg['Names'].pop(widget.text())
+        self.take_check(widget)
+        self.refresh_layout()
+
+    def name_change(self, name, is_checked):
+        """
+        Modifies name in the internal config.
+
+        Parameters
+        ----------
+        name : str
+            Name of the value to update.
+        is_checked : bool
+            The state for the name.
+        """
+        self.cfg['Names'][name] = str(is_checked)
+
+    def accept(self):
+        """
+        Saves the cfg to the file.
+        """
+        with open(self.PATH, 'w') as c_file:
+            self.cfg.write(c_file)
+        super().accept()
+
+class MainWidget(QMainWindow):
     """
     Primary application entry point.
 
@@ -105,6 +296,11 @@ class MainWidget(QWidget):
             'Thursday',
             'Friday',
             'Saturday')
+        self.already_haves = None
+        already_have_act = QAction('Edit Already Haves', self)
+        already_have_act.triggered.connect(self.edit_already_haves)
+        file_menu = self.menuBar().addMenu('File')
+        file_menu.addAction(already_have_act)
         self.string_io = string_io
         self.button_group = QButtonGroup()
         self.button_group.setExclusive(False)
@@ -133,12 +329,22 @@ class MainWidget(QWidget):
         for button in self.button_group.buttons():
             button.setChecked(True)
             layout.addWidget(button)
-        layout = QFormLayout(self)
+        widget = QWidget()
+        layout = QFormLayout(widget)
         layout.addRow('Select Days', day_group)
         layout.addRow('FileName', self.file_name)
         layout.addRow('Output Directory', self.output_dir)
         layout.addRow('Status', self.status)
         layout.addWidget(self.generate_list_but)
+        self.setCentralWidget(widget)
+        self.edit_already_haves()
+
+    def edit_already_haves(self):
+        """
+        Creates the widget to modify already haves.
+        """
+        self.already_haves = AlreadyHave(self.centralWidget())
+        self.already_haves.open()
 
     def update_status(self, new_value):
         """
@@ -157,6 +363,7 @@ class MainWidget(QWidget):
         """
         Builds the shopping list when geenrate is chosen.
         """
+        already_have = self.get_already_have()
         self.build_string_monitor()
         self.generate_list_but.setEnabled(False)
         days = {}
@@ -169,11 +376,35 @@ class MainWidget(QWidget):
             self.status.setText(f'Output dir does not exist! {out_dir}')
             return
         self.shop_thread = QThread()
-        self.shopping_worker = ShoppingWorker(days, out_file, self.string_io)
+        self.shopping_worker = ShoppingWorker(
+            days, out_file, self.string_io, already_have)
         self.shopping_worker.moveToThread(self.shop_thread)
         self.shopping_worker.finished.connect(self.all_done)
         self.shop_thread.started.connect(self.shopping_worker.run)
         self.shop_thread.start()
+
+    def get_already_have(self):
+        """
+        Builds the already_have set from the ini file.
+
+        Returns
+        =======
+        set
+            The already have names that should be ignored.
+        """
+        already_have = set()
+        cfg = ConfigParser()
+        path = Path(AlreadyHave.PATH)
+        if not path.exists():
+            cfg['Names'] = {}
+            with open(path, 'w') as ini:
+                cfg.write(ini)
+        #Now read the path
+        cfg.read(path)
+        for name in cfg['Names']:
+            if cfg['Names'].getboolean(name):
+                already_have.add(name)
+        return already_have
 
     def build_string_monitor(self):
         """
