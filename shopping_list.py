@@ -3,6 +3,7 @@ Generates a text file of shopping list items based
 on the sheets created on google drive for Food.
 """
 import copy
+import datetime as dt
 import os
 from pathlib import Path
 import logging
@@ -28,30 +29,24 @@ def load_food_plan(worksheet, used_days):
     ----------
     worksheet : gspread.models.Spreadsheet
         The worksheet to read the days from.
+    used_days : tuple
+        Desired days from the sheet.
 
     Returns
     -------
     dict
         Dictionary by day of pandas data frames.
     """
-    week_days = ('sunday',
-        'monday',
-        'tuesday',
-        'wednesday',
-        'thursday',
-        'friday',
-        'saturday',
-    )
+    str_days = {day.strftime('%A').lower():day for day in used_days}
     days = {}
     if worksheet is None:
         return days
-    use_all = not any(used_days)
     for sheet in worksheet:
-        name = sheet.title.lower()
-        if name in week_days:
-            if used_days.get(name) or use_all:
-                data = sheet.get_all_values()
-                days[name] = pd.DataFrame(data)
+        sheet_name = sheet.title.lower()
+        sheet_day = str_days.get(sheet_name.lower())
+        if sheet_day:
+            data = sheet.get_all_values()
+            days[sheet_day] = pd.DataFrame(data)
     return days
 
 def build_food_from_days(user_days):
@@ -353,8 +348,9 @@ def main(used_days, output_file='shopping_list.txt', string_io=None, already_hav
 
     Parameters
     ----------
-    user : str
-        User name for the sheet.
+    usec_days : tuple
+        dt.date.Dates that are desired to be aquired
+        from the sheets.
     output_file : str, optional, default='test.txt'
         Output file to put the shopping list.
 
@@ -375,7 +371,7 @@ def main(used_days, output_file='shopping_list.txt', string_io=None, already_hav
     if not any(used_days):
         logger.info('Building sheet for all days')
     else:
-        msg = f'Building sheet with {[day for day, used in used_days.items() if used]}'
+        msg = f"Building sheet with {[day.strftime('%A') for day in used_days]}"
         logger.info(msg)
     scope = ['https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive']
@@ -413,7 +409,13 @@ def main(used_days, output_file='shopping_list.txt', string_io=None, already_hav
     shopping_list = list(shopping_list.values())
     shopping_list.sort()
     shopping_groups = build_groups(shopping_list)
+    today = dt.date.today()
     with open(output_file, 'w+', encoding='utf-8') as s_file:
+        first_line = ''
+        for day_num in range(7):
+            day = today + dt.timedelta(days=day_num)
+            first_line += day.strftime('(%a - %m/%d)')
+        s_file.write(first_line + '\n\n')
         for group_name, food_list in shopping_groups.items():
             s_file.write(group_name + '\n')
             s_file.write('-'*len(group_name) + '\n')
@@ -425,4 +427,6 @@ def main(used_days, output_file='shopping_list.txt', string_io=None, already_hav
 
 if __name__ == '__main__':
     F_NAME = 'shopping_list.txt'
-    main({}, F_NAME, already_have=set(['cumin']))
+    day = dt.date.today()
+    used_days = (day + dt.timedelta(days=num) for num in range(7))
+    main((), F_NAME, already_have=set(['cumin']))

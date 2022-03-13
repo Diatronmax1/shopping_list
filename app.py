@@ -2,6 +2,7 @@
 Main application window to create shopping lists from.
 """
 from configparser import ConfigParser
+import datetime as dt
 import os
 from pathlib import Path
 import time
@@ -11,7 +12,6 @@ from PyQt5.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QDialog,
-    QFormLayout,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -22,6 +22,7 @@ from PyQt5.QtWidgets import (
     QMenu,
     QPushButton,
     QTextEdit,
+    QVBoxLayout,
     QWidget,
 )
 from PyQt5.QtGui import QTextCursor
@@ -297,13 +298,7 @@ class MainWidget(QMainWindow):
         super().__init__()
         self.setWindowTitle('Shopping List Creator')
         #Checkable days.
-        days = ('Sunday',
-            'Monday',
-            'Tuesday',
-            'Wednesday',
-            'Thursday',
-            'Friday',
-            'Saturday')
+        today = dt.date.today()
         self.already_haves = None
         already_have_act = QAction('Edit Already Haves', self)
         already_have_act.triggered.connect(self.edit_already_haves)
@@ -312,8 +307,9 @@ class MainWidget(QMainWindow):
         self.string_io = string_io
         self.button_group = QButtonGroup()
         self.button_group.setExclusive(False)
-        for day in days:
-            new_day = QCheckBox(day, self)
+        for day_num in range(7):
+            day = today + dt.timedelta(days=day_num)
+            new_day = QCheckBox(day.strftime('%A (%m/%d)'), self)
             self.button_group.addButton(new_day)
         #Name of the file.
         self.file_name = QLineEdit()
@@ -337,12 +333,21 @@ class MainWidget(QMainWindow):
         for button in self.button_group.buttons():
             button.setChecked(True)
             layout.addWidget(button)
+        name_line = QWidget()
+        layout = QHBoxLayout(name_line)
+        layout.addWidget(QLabel('File name'))
+        layout.addWidget(self.file_name)
+        out_line = QWidget()
+        layout = QHBoxLayout(out_line)
+        layout.addWidget(QLabel('Output Directory'))
+        layout.addWidget(self.output_dir)
         widget = QWidget()
-        layout = QFormLayout(widget)
-        layout.addRow('Select Days', day_group)
-        layout.addRow('FileName', self.file_name)
-        layout.addRow('Output Directory', self.output_dir)
-        layout.addRow('Status', self.status)
+        layout = QVBoxLayout(widget)
+        layout.addWidget(day_group)
+        layout.addWidget(name_line)
+        layout.addWidget(out_line)
+        layout.addWidget(QLabel('Status'))
+        layout.addWidget(self.status)
         layout.addWidget(self.generate_list_but)
         self.setCentralWidget(widget)
         self.edit_already_haves()
@@ -394,9 +399,14 @@ class MainWidget(QMainWindow):
         already_have = self.get_already_have()
         self.build_string_monitor()
         self.generate_list_but.setEnabled(False)
-        days = {}
-        for button in self.button_group.buttons():
-            days[button.text().lower()] = button.isChecked()
+        days = []
+        #Buttons always start with today.
+        today = dt.date.today()
+        for day_num, button in enumerate(self.button_group.buttons()):
+            if button.isChecked():
+                day = today + dt.timedelta(days=day_num)
+                days.append(day)
+        days = tuple(days)
         file_name = os.path.splitext(self.file_name.text())[0] + '.txt'
         out_dir = Path(self.output_dir.text())
         out_file = out_dir / file_name

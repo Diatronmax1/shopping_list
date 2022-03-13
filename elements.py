@@ -5,17 +5,6 @@ with items that we want for the sheet.
 
 from pint import DimensionalityError
 
-
-DAYS = {
-    'sunday':0,
-    'monday':1,
-    'tuesday':2,
-    'wednesday':3,
-    'thursday':4,
-    'friday':5,
-    'saturday':6
-    }
-
 class Food():
     """
     An element of the list with a name and serving amt.
@@ -50,8 +39,8 @@ class Food():
         =======
         str
         """
-        days = sorted(list(self.days), key=DAYS.get)
-        short_days = ','.join([day[:2] for day in days])
+        days = sorted(self.days)
+        short_days = ','.join([day.strftime('%a') for day in days])
         return f'({short_days})'
 
     def __str__(self):
