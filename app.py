@@ -139,6 +139,7 @@ class AlreadyHave(QDialog):
         self.setWindowTitle('Check boxes to modify values')
         self.cfg = ConfigParser()
         self.cfg.read(self.PATH)
+        self.check_config()
         self.save_and_close = QPushButton('Save and Close')
         self.cancel_but = QPushButton('Cancel')
         self.create_new = QPushButton('New')
@@ -155,6 +156,13 @@ class AlreadyHave(QDialog):
         self.main_layout = QGridLayout(self)
         self.resize(400,400)
         self.refresh_layout()
+
+    def check_config(self):
+        """
+        Makes sure there is a Names field.
+        """
+        if 'Names' not in self.cfg:
+            self.cfg['Names'] = {}
 
     def refresh_layout(self):
         """
