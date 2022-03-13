@@ -3,6 +3,8 @@ Generates a text file of shopping list items based
 on the sheets created on google drive for Food.
 """
 import copy
+import os
+from pathlib import Path
 import logging
 import math
 
@@ -12,6 +14,8 @@ import pandas as pd
 from pint import UnitRegistry
 
 from elements import ChosenItem, Food, Recipe
+
+os.chdir(Path(__file__).parent)
 
 UREG = UnitRegistry()
 UREG.load_definitions('unit_def.txt')
