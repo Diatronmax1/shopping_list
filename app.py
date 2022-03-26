@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -29,8 +30,9 @@ import yaml
 
 import shopping_list
 from already_have import AlreadyHave
+from dynamic_sheet import DynamicSheet
 from sheet_days import SheetDay
-from core import DAYS
+from core import DAYS, CFG_PATH
 from workers import StringMonitor, ShoppingWorker
 
 class MainWidget(QMainWindow):
@@ -46,16 +48,15 @@ class MainWidget(QMainWindow):
 
     """
 
-    PATH = Path('config.yml')
-
     def __init__(self, string_io):
         super().__init__()
         self.setWindowTitle('Shopping List Creator')
-        self.check_config()
-        with open(self.PATH, 'rb') as y_file:
+        with open(CFG_PATH, 'rb') as y_file:
             cfg_dict = yaml.load(y_file, yaml.Loader)
         self._threaded = cfg_dict['threaded']
         self.already_haves = None
+        self.dynamic_sheet = None
+        self._shopping_list = []
         self.make_menu()
         self.string_io = string_io
         self.button_group = QButtonGroup()
@@ -78,6 +79,7 @@ class MainWidget(QMainWindow):
         self.string_worker = None
         #Contains sheet names and sets.
         self.generate_list_but = QPushButton('Generate List')
+        self.generate_list_but.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         apply_all_but = QPushButton('Apply To All Sheets')
         #Signals
         self.generate_list_but.clicked.connect(self.make_shopping_list)
@@ -109,9 +111,12 @@ class MainWidget(QMainWindow):
         layout.addWidget(sheet_group)
         layout.addWidget(name_line)
         layout.addWidget(out_line)
-        layout.addWidget(QLabel('Status'))
+        stat_line = QWidget()
+        s_layout = QHBoxLayout(stat_line)
+        s_layout.addWidget(QLabel('Status'))
+        s_layout.addWidget(self.generate_list_but)
+        layout.addWidget(stat_line)
         layout.addWidget(self.status)
-        layout.addWidget(self.generate_list_but)
         self.setCentralWidget(widget)
 
     def make_menu(self):
@@ -157,17 +162,23 @@ class MainWidget(QMainWindow):
         Tries to open the dynamic sheet if one is currently active from a generate sheet
         or possibly loadable from the output text results.
         """
-        print('open dynamic sheet')
+        if not any(self._shopping_list):
+            QMessageBox.information(self,
+                'Dynamic Sheet',
+                'Must have an active sheet back from generate list',)
+            return
+        self.dynamic_sheet = DynamicSheet(self, self._shopping_list)
+        self.dynamic_sheet.open()
 
     def change_threaded_state(self, state):
         """
         Modifies the threaded state.
         """
         self._threaded = state
-        with open(self.PATH, 'rb') as y_file:
+        with open(CFG_PATH, 'rb') as y_file:
             yaml_dict = yaml.load(y_file, yaml.Loader)
             yaml_dict['threaded'] = self._threaded
-        with open(self.PATH, 'w') as y_file:
+        with open(CFG_PATH, 'w') as y_file:
             yaml_dict = yaml.dump(yaml_dict, y_file, yaml.Dumper)
 
     def edit_sheet_data(self, sheet_name):
@@ -209,10 +220,10 @@ class MainWidget(QMainWindow):
         for sheet_name in sheets:
             sheets[sheet_name] = list(update_days)
         #Now convert for writing.
-        with open(self.PATH, 'r') as y_file:
+        with open(CFG_PATH, 'r') as y_file:
             yml_dict = yaml.load(y_file, yaml.Loader)
             yml_dict['sheets'] = sheets
-        with open(self.PATH, 'w') as y_file:
+        with open(CFG_PATH, 'w') as y_file:
             yaml.dump(yml_dict, y_file, yaml.Dumper)
 
     def check_for_keyfile(self):
@@ -239,7 +250,7 @@ class MainWidget(QMainWindow):
         """
         Creates the widget to modify already haves.
         """
-        self.already_haves = AlreadyHave(self.centralWidget(), self.PATH)
+        self.already_haves = AlreadyHave(self)
         self.already_haves.open()
 
     def update_status(self, new_value):
@@ -278,8 +289,8 @@ class MainWidget(QMainWindow):
             self.shop_thread.started.connect(self.shopping_worker.run)
             self.shop_thread.start()
         else:
-            shopping_list.main(sheet_data, out_file, self.string_io, ignored)
-            self.all_done()
+            _shopping_list = shopping_list.main(sheet_data, out_file, self.string_io, ignored)
+            self.all_done(_shopping_list)
 
     def get_sheet_data(self, ignore_used_days_empty=False):
         """
@@ -292,7 +303,7 @@ class MainWidget(QMainWindow):
             Will treat an emtpy set of days as requesting
             all days, used mainly for normal shopping.
         """
-        with open(self.PATH, 'rb') as y_file:
+        with open(CFG_PATH, 'rb') as y_file:
             yml_dict = yaml.load(y_file, yaml.Loader)
             sheets = yml_dict['sheets']
         fixed_sheets = {}
@@ -308,45 +319,22 @@ class MainWidget(QMainWindow):
         #Then update the fixed sheets as the return.
         return fixed_sheets
 
-    def check_config(self):
-        """
-        Validates the config path.
-        """
-        if not self.PATH.exists():
-            self.create_default_config()
-
     def get_already_have(self):
         """
-        Builds the already_have set from the ini file.
+        Builds the ignored set from the config file.
 
         Returns
         =======
         set
             The already have names that should be ignored.
         """
-        already_have = set()
-        with open(self.PATH, 'rb') as y_file:
+        ignored = set()
+        with open(CFG_PATH, 'rb') as y_file:
             yml_dict = yaml.load(y_file, yaml.Loader)
         for name, use in yml_dict['names'].items():
             if use:
-                already_have.add(name)
-        return already_have
-
-    def create_default_config(self):
-        """
-        Builds the default configuration file.
-        """
-        default_names = (
-            'Chris Food Plan',
-            "Melia's Food Plan",
-            "Bryn's Food Plan")
-        yml_dict = {
-            'names': {},
-            'sheets' : {name:None for name in default_names},
-            'threaded':True,
-        }
-        with open(self.PATH, 'w') as y_file:
-            yaml.dump(yml_dict, y_file)
+                ignored.add(name)
+        return ignored
 
     def build_string_monitor(self):
         """
@@ -360,11 +348,12 @@ class MainWidget(QMainWindow):
         self.string_worker.string_changed.connect(self.update_status)
         self.mon_thread.start()
 
-    def all_done(self):
+    def all_done(self, results):
         """
         Close the string monitor and re-enable the list
         generator.
         """
+        self._shopping_list = results
         if self.string_worker:
             self.string_worker.alive = False
         self.mon_thread.quit()

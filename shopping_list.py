@@ -251,7 +251,7 @@ def create_shopping_list(items, master_df, recipes, already_have):
         units appended to them.
     """
     logger = logging.getLogger(__name__)
-    shopping_list = {}
+    all_food = {}
     #Grab a list of food names to build a list of needed recipes.
     food_names = list(items.keys())
     ignored = {}
@@ -274,10 +274,10 @@ def create_shopping_list(items, master_df, recipes, already_have):
                     else:
                         ignored[new_food.name] = new_food.amount
                     continue
-                if new_food.name in shopping_list:
-                    shopping_list[new_food.name] += new_food
+                if new_food.name in all_food:
+                    all_food[new_food.name] += new_food
                 else:
-                    shopping_list[new_food.name] = new_food
+                    all_food[new_food.name] = new_food
     #Now grab all remaining food items from the master df. Report any missing items
     #to the user.
     for chosen_name, chosen_item in items.items():
@@ -302,17 +302,17 @@ def create_shopping_list(items, master_df, recipes, already_have):
             else:
                 ignored[new_food.name] = new_food.amount
                 continue
-        if new_food.name in shopping_list:
-            shopping_list[new_food.name] += new_food
+        if new_food.name in all_food:
+            all_food[new_food.name] += new_food
         else:
-            shopping_list[new_food.name] = new_food
+            all_food[new_food.name] = new_food
     #Alert the user that we are ignoring these items.
     for food_name, amount in ignored.items():
         msg = f'Assuming already have {amount:.2f} of {food_name}'
         logger.info(msg)
-    return shopping_list
+    return all_food
 
-def build_groups(shopping_list):
+def build_groups(food_items):
     """
     Takes a list of Food items and creates a dictionary
     organized by food_type. Blank food types will be appended
@@ -320,8 +320,8 @@ def build_groups(shopping_list):
 
     Parameters
     ----------
-    shopping_list : list
-        Input list of Food items.
+    food_items : dict
+        Input dict of Food items.
 
     Returns
     -------
@@ -331,7 +331,7 @@ def build_groups(shopping_list):
     """
     groups = {}
     no_group = []
-    for food_item in shopping_list:
+    for food_item in food_items.values():
         if food_item.food_type == '':
             no_group.append(food_item)
             continue
@@ -339,6 +339,9 @@ def build_groups(shopping_list):
             groups[food_item.food_type] = []
         groups[food_item.food_type].append(food_item)
     groups['No Category'] = no_group
+    #Sort the groups
+    for group in groups:
+        groups[group].sort()
     return groups
 
 def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_have=None):
@@ -389,10 +392,8 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
     logger.info('Combining food sheets')
     food_by_day = build_food_from_days(days)
     logger.info('Creating the food list')
-    shopping_list = create_shopping_list(food_by_day, master_df, recipes, already_have)
-    shopping_list = list(shopping_list.values())
-    shopping_list.sort()
-    shopping_groups = build_groups(shopping_list)
+    all_food = create_shopping_list(food_by_day, master_df, recipes, already_have)
+    shopping_groups = build_groups(all_food)
     today = dt.date.today()
     with open(output_file, 'w+', encoding='utf-8') as s_file:
         first_line = ''
@@ -418,3 +419,4 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
             s_file.write('\n')
     msg = f'File Created {output_file}'
     logger.info(msg)
+    return all_food

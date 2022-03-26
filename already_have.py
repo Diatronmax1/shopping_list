@@ -14,6 +14,32 @@ from PyQt5.QtWidgets import (
 )
 import yaml
 
+from core import CFG_PATH
+
+def write_names(names):
+    """
+    Writes names dictionary to the yaml.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the config file.
+    names : dict
+        The new names dictionary.
+    """
+    with open(CFG_PATH, 'rb') as y_file:
+        yml_dict = yaml.load(y_file, yaml.Loader)
+        yml_dict['names'] = names
+    with open(CFG_PATH, 'w') as y_file:
+        yaml.dump(yml_dict, y_file, yaml.Dumper)
+
+def get_names():
+    """
+    Retrieves names from the config file.
+    """
+    with open(CFG_PATH, 'rb') as y_file:
+        return yaml.load(y_file, yaml.Loader)['names']
+
 class HaveCheck(QCheckBox):
     """
     Subclassing the Checkbox to catch
@@ -55,13 +81,10 @@ class AlreadyHave(QDialog):
 
     MAX_ROWS = 10
 
-    def __init__(self, parent, config_path):
+    def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle('Check boxes to modify values')
-        self.config_path = config_path
-        self.names = {}
-        with open(self.config_path, 'rb') as y_file:
-            self.names = yaml.load(y_file, yaml.Loader)['names']
+        self.names = get_names()
         self.save_and_close = QPushButton('Save and Close')
         self.cancel_but = QPushButton('Cancel')
         self.create_new = QPushButton('New')
@@ -190,9 +213,5 @@ class AlreadyHave(QDialog):
         """
         Saves the cfg to the file.
         """
-        with open(self.config_path, 'rb') as y_file:
-            yml_dict = yaml.load(y_file, yaml.Loader)
-            yml_dict['names'] = self.names
-        with open(self.config_path, 'w') as y_file:
-            yaml.dump(yml_dict, y_file, yaml.Dumper)
+        write_names(self.names)
         super().accept()
