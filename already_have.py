@@ -40,6 +40,19 @@ def get_names():
     with open(CFG_PATH, 'rb') as y_file:
         return yaml.load(y_file, yaml.Loader)['names']
 
+def get_ignored():
+    """
+    Builds the ignored set from the config file.
+    Case insensitive is preserved by always loading
+    the names in as lowercase.
+
+    Returns
+    =======
+    set
+        The already have names that should be ignored.
+    """
+    return set([name.lower() for name, use in get_names().items() if use])
+
 class HaveCheck(QCheckBox):
     """
     Subclassing the Checkbox to catch
@@ -207,7 +220,7 @@ class AlreadyHave(QDialog):
         is_checked : bool
             The state for the name.
         """
-        self.names[name] = is_checked
+        self.names[name.lower()] = is_checked
 
     def accept(self):
         """

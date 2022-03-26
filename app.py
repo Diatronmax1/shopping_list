@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QGroupBox,
+    QFormLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -29,9 +30,9 @@ from PyQt5.QtCore import QThread
 import yaml
 
 import shopping_list
-from already_have import AlreadyHave
+import already_have
 from dynamic_sheet import DynamicSheet
-from sheet_days import SheetDay
+import sheet_days
 from core import DAYS, CFG_PATH
 from workers import StringMonitor, ShoppingWorker
 
@@ -56,21 +57,22 @@ class MainWidget(QMainWindow):
         self._threaded = cfg_dict['threaded']
         self.already_haves = None
         self.dynamic_sheet = None
-        self._shopping_list = []
-        self.make_menu()
+        self._shopping_list = {}
         self.string_io = string_io
-        self.button_group = QButtonGroup()
-        self.button_group.setExclusive(False)
+        self.make_menu()
+        #Create button group for days.
+        self.day_buttons = QButtonGroup()
+        self.day_buttons.setExclusive(False)
         for day in DAYS.values():
             new_check = QCheckBox(day.strftime('%A (%m/%d)'), self)
-            self.button_group.addButton(new_check)
+            self.day_buttons.addButton(new_check)
         #Name of the file.
         self.file_name = QLineEdit()
-        self.file_name.setText('shopping_list')
+        self.file_name.setText(cfg_dict['filename'])
         #Output directory.
-        def_path = Path.home() / 'Desktop'
+        def_path = Path(cfg_dict['output_dir']).expanduser()
         self.output_dir = QLineEdit()
-        self.output_dir.setText(str(def_path))
+        self.output_dir.setText(def_path.as_posix())
         self.status = QTextEdit()
         #Setup the string monitor.
         self.shop_thread = None
@@ -87,37 +89,40 @@ class MainWidget(QMainWindow):
         #Layout
         day_group = QGroupBox('Days')
         layout = QHBoxLayout(day_group)
-        for button in self.button_group.buttons():
+        for button in self.day_buttons.buttons():
             button.setChecked(True)
             layout.addWidget(button)
         layout.addWidget(apply_all_but)
         sheet_group = QGroupBox('Sheets')
         layout = QHBoxLayout(sheet_group)
-        for sheet_name in self.get_sheet_data():
-            new_button = QPushButton(sheet_name)
-            new_button.clicked.connect(partial(self.edit_sheet_data, sheet_name))
+        self.sheet_day_buttons = QButtonGroup()
+        self.sheet_day_buttons.setExclusive(False)
+        for sheet_name, button_name in sheet_days.sheets_with_daystrings().items():
+            new_button = QPushButton(button_name)
+            #For now just manually settting it, bad practice maybe.
+            new_button.sheet_name = sheet_name
+            new_button.clicked.connect(partial(self.edit_sheet_data, new_button, sheet_name))
+            self.sheet_day_buttons.addButton(new_button)
             layout.addWidget(new_button)
-        name_line = QWidget()
-        layout = QHBoxLayout(name_line)
-        layout.addWidget(QLabel('File name'))
-        layout.addWidget(self.file_name)
-        out_line = QWidget()
-        layout = QHBoxLayout(out_line)
-        layout.addWidget(QLabel('Output Directory'))
-        layout.addWidget(self.output_dir)
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.addWidget(day_group)
-        layout.addWidget(sheet_group)
-        layout.addWidget(name_line)
-        layout.addWidget(out_line)
+        #Main
         stat_line = QWidget()
         s_layout = QHBoxLayout(stat_line)
         s_layout.addWidget(QLabel('Status'))
         s_layout.addWidget(self.generate_list_but)
+        file_line = QWidget()
+        layout = QFormLayout(file_line)
+        layout.addRow('File name', self.file_name)
+        layout.addRow('Output Directory', self.output_dir)
+        #Main Layout
+        central_widget = QWidget()
+        layout = QVBoxLayout(central_widget)
+        layout.addWidget(day_group)
+        layout.addWidget(sheet_group)
+        layout.addWidget(file_line)
         layout.addWidget(stat_line)
         layout.addWidget(self.status)
-        self.setCentralWidget(widget)
+        #Set main.
+        self.setCentralWidget(central_widget)
 
     def make_menu(self):
         """
@@ -149,13 +154,11 @@ class MainWidget(QMainWindow):
         """
         Tries to open the shopping list if the path exists.
         """
-        file_name = os.path.splitext(self.file_name.text())[0] + '.txt'
-        out_dir = Path(self.output_dir.text())
-        out_file = out_dir / file_name
-        if not out_dir.exists():
-            QMessageBox.information(self, 'Open File', f'{out_file} does not exist!')
+        shop_file = self.get_outfile()
+        if not shop_file.exists():
+            QMessageBox.information(self, 'Open File', f'{shop_file} does not exist!')
             return
-        os.startfile(out_file)
+        os.startfile(shop_file)
 
     def open_dynamic_sheet(self):
         """
@@ -181,12 +184,13 @@ class MainWidget(QMainWindow):
         with open(CFG_PATH, 'w') as y_file:
             yaml_dict = yaml.dump(yaml_dict, y_file, yaml.Dumper)
 
-    def edit_sheet_data(self, sheet_name):
+    def edit_sheet_data(self, button, sheet_name):
         """
         Called when a button is pressed in the GUI spawns
         the sheet editor.
         """
-        dialog = SheetDay(self, sheet_name)
+        dialog = sheet_days.SheetDay(self, sheet_name)
+        dialog.update_name.connect(button.setText)
         dialog.open()
 
     def update_all_sheet_data(self):
@@ -203,13 +207,11 @@ class MainWidget(QMainWindow):
             )
         if result == QMessageBox.Cancel:
             return
-        #Now go through and update all sheet data to match
-        #the current buttons.
-        sheets = self.get_sheet_data()
+        #Find the relevant buttons by button name.
         fmt_days = {day.strftime('%A (%m/%d)'):day.strftime("%A") for day in DAYS.values()}
         update_days = set()
         use_all = True
-        for button in self.button_group.buttons():
+        for button in self.day_buttons.buttons():
             if button.isChecked():
                 update_days.add(fmt_days[button.text()])
             else:
@@ -217,14 +219,11 @@ class MainWidget(QMainWindow):
         if use_all:
             update_days.clear()
         #Now go over each sheet and reset their data.
-        for sheet_name in sheets:
-            sheets[sheet_name] = list(update_days)
-        #Now convert for writing.
-        with open(CFG_PATH, 'r') as y_file:
-            yml_dict = yaml.load(y_file, yaml.Loader)
-            yml_dict['sheets'] = sheets
-        with open(CFG_PATH, 'w') as y_file:
-            yaml.dump(yml_dict, y_file, yaml.Dumper)
+        sheet_days.update_all_sheet_data(update_days)
+        #Then go update all the button names.
+        day_strings = sheet_days.sheets_with_daystrings()
+        for button in self.sheet_day_buttons.buttons():
+            button.setText(day_strings[button.sheet_name])
 
     def check_for_keyfile(self):
         """
@@ -250,7 +249,7 @@ class MainWidget(QMainWindow):
         """
         Creates the widget to modify already haves.
         """
-        self.already_haves = AlreadyHave(self)
+        self.already_haves = already_have.AlreadyHave(self)
         self.already_haves.open()
 
     def update_status(self, new_value):
@@ -266,21 +265,40 @@ class MainWidget(QMainWindow):
         self.status.moveCursor(QTextCursor.End)
         self.status.ensureCursorVisible()
 
+    def get_outfile(self, save_cfg=False):
+        """
+        Retrieves the output file path.
+
+        Parameters
+        ----------
+        save_cfg : bool, optional, default=False
+            If true, will write the current filename
+            and output_dir to the config file.
+        """
+        file_name = Path(self.file_name.text()).with_suffix('.txt')
+        out_dir = Path(self.output_dir.text())
+        if save_cfg:
+            with open(CFG_PATH, 'rb') as y_file:
+                yml_dict = yaml.load(y_file, yaml.Loader)
+                yml_dict['filename'] = file_name.name
+                yml_dict['output_dir'] = out_dir.as_posix()
+            with open(CFG_PATH, 'w') as y_file:
+                yaml.dump(yml_dict, y_file, yaml.Dumper)
+        return out_dir / file_name
+
     def make_shopping_list(self):
         """
         Builds the shopping list when geenrate is chosen.
         """
-        ignored = self.get_already_have()
+        ignored = already_have.get_ignored()
         self.build_string_monitor()
         self.generate_list_but.setEnabled(False)
-        file_name = os.path.splitext(self.file_name.text())[0] + '.txt'
-        out_dir = Path(self.output_dir.text())
-        out_file = out_dir / file_name
-        if not out_dir.exists():
-            self.status.setText(f'Output dir does not exist! {out_dir}')
+        out_file = self.get_outfile(save_cfg=True)
+        if not out_file.parent.exists():
+            self.status.setText(f'Output dir {out_file.parent} does not exist!')
             return
         self.shop_thread = QThread()
-        sheet_data = self.get_sheet_data(True)
+        sheet_data = sheet_days.get_sheet_data(True)
         if self._threaded:
             self.shopping_worker = ShoppingWorker(
                 sheet_data, out_file, self.string_io, ignored)
@@ -291,50 +309,6 @@ class MainWidget(QMainWindow):
         else:
             _shopping_list = shopping_list.main(sheet_data, out_file, self.string_io, ignored)
             self.all_done(_shopping_list)
-
-    def get_sheet_data(self, ignore_used_days_empty=False):
-        """
-        Goes through the available sheet names and checks the
-        states of their options.
-
-        Parameters
-        ----------
-        ignore_used_days_empty : bool, optional, default=False
-            Will treat an emtpy set of days as requesting
-            all days, used mainly for normal shopping.
-        """
-        with open(CFG_PATH, 'rb') as y_file:
-            yml_dict = yaml.load(y_file, yaml.Loader)
-            sheets = yml_dict['sheets']
-        fixed_sheets = {}
-        for sheet_name, used_days in sheets.items():
-            partial_days = set()
-            if used_days:
-                for day in used_days:
-                    #Grab the day from the global dict.
-                    partial_days.add(DAYS[day])
-            elif ignore_used_days_empty:
-                partial_days.update(day for day in DAYS.values())
-            fixed_sheets[sheet_name] = partial_days
-        #Then update the fixed sheets as the return.
-        return fixed_sheets
-
-    def get_already_have(self):
-        """
-        Builds the ignored set from the config file.
-
-        Returns
-        =======
-        set
-            The already have names that should be ignored.
-        """
-        ignored = set()
-        with open(CFG_PATH, 'rb') as y_file:
-            yml_dict = yaml.load(y_file, yaml.Loader)
-        for name, use in yml_dict['names'].items():
-            if use:
-                ignored.add(name)
-        return ignored
 
     def build_string_monitor(self):
         """

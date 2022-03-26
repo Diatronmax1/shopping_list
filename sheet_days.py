@@ -3,6 +3,7 @@ Provides widgets for editing days for individual
 sheet users.
 """
 #pylint: disable=unspecified-encoding
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -12,7 +13,79 @@ from PyQt5.QtWidgets import (
 )
 import yaml
 
-from core import DAYS
+from core import CFG_PATH, DAYS
+
+def get_sheets():
+    """
+    Retrieves sheets from the config file.
+    """
+    with open(CFG_PATH, 'rb') as y_file:
+        return yaml.load(y_file, yaml.Loader)['sheets']
+
+def get_sheet_data(ignore_used_days_empty=False):
+    """
+    Goes through the available sheet names and checks the
+    states of their options.
+
+    Parameters
+    ----------
+    ignore_used_days_empty : bool, optional, default=False
+        Will treat an emtpy set of days as requesting
+        all days, used mainly for normal shopping.
+    """
+    sheets = get_sheets()
+    fixed_sheets = {}
+    for sheet_name, used_days in sheets.items():
+        partial_days = set()
+        if used_days:
+            for day in used_days:
+                #Grab the day from the global dict.
+                partial_days.add(DAYS[day])
+        elif ignore_used_days_empty:
+            partial_days.update(day for day in DAYS.values())
+        fixed_sheets[sheet_name] = partial_days
+    #Then update the fixed sheets as the return.
+    return fixed_sheets
+
+def sheets_with_daystrings():
+    """
+    Retrieves the day string for sheets.
+
+    Returns
+    -------
+    dict
+        Sheet names and strings for display.
+    """
+    day_strings = {}
+    for sheet_name, used_days in get_sheet_data().items():
+        if any(used_days):
+            day_str = f" {tuple([day.strftime('%a') for day in sorted(used_days)])}"
+        else:
+            day_str = " all days"
+        day_strings[sheet_name] = f'{sheet_name} {day_str}'
+    return day_strings
+
+def update_all_sheet_data(used_days):
+    """
+    Casts to the config file all of the used_days, or
+    if use All, clears the config data.
+
+    Parameters
+    ----------
+    used_days : set
+        The datetimes of the days to use.
+    use_all : bool
+        Whether or not all days should be used.
+    """
+    sheets = get_sheet_data()
+    for sheet_name in sheets:
+        sheets[sheet_name] = list(used_days)
+    #Now convert for writing.
+    with open(CFG_PATH, 'r') as y_file:
+        yml_dict = yaml.load(y_file, yaml.Loader)
+        yml_dict['sheets'] = sheets
+    with open(CFG_PATH, 'w') as y_file:
+        yaml.dump(yml_dict, y_file, yaml.Dumper)
 
 class SheetDay(QDialog):
     """
@@ -28,10 +101,13 @@ class SheetDay(QDialog):
 
     """
 
+    update_name = pyqtSignal(str)
+
     def __init__(self, parent, sheet_name):
         super().__init__(parent)
+        self.setWindowTitle(f'Editing {sheet_name}')
         self.sheet_name = sheet_name
-        self.sheets = self.parent().get_sheet_data()
+        self.sheets = get_sheet_data()
         self.current_sheet = self.sheets[self.sheet_name]
         layout = QFormLayout(self)
         layout.addRow('Editing Sheet', QLabel(sheet_name))
@@ -64,9 +140,11 @@ class SheetDay(QDialog):
         save_sheets = {}
         for sheet_name, used_days in self.sheets.items():
             save_sheets[sheet_name] = [day.strftime('%A') for day in used_days]
-        with open(self.parent().PATH, 'rb') as y_file:
+        with open(CFG_PATH, 'rb') as y_file:
             cur_yml = yaml.load(y_file, yaml.Loader)
             cur_yml['sheets'] = save_sheets
-        with open(self.parent().PATH, 'w') as y_file:
+        with open(CFG_PATH, 'w') as y_file:
             yaml.dump(cur_yml, y_file, yaml.Dumper)
+        day_strings = sheets_with_daystrings()
+        self.update_name.emit(day_strings[self.sheet_name])
         super().accept()

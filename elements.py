@@ -102,7 +102,10 @@ class Food():
         return type(self)(self.name, self.amount, self.rec_unit, self.food_type)
 
     def __iadd__(self, other):
+        if not isinstance(other, self.__class__):
+            raise TypeError(f'Can only add food items to each other not {other}')
         self.amount += other.amount
+        self.days |= other.days
         return self
 
     def __imul__(self, other):

@@ -183,6 +183,9 @@ def load_recipes(recipe_df, raw_df):
         #So the next time in the loop we will look for ingredient names.
         if cur_recipe and first_col == 'Ingredients':
             start_track = True
+    #Grab the last recipe.
+    if recipe_name not in recipes:
+        recipes[recipe_name] = cur_recipe
     return recipes
 
 def load_food_list(wks):
@@ -229,6 +232,33 @@ def load_food_list(wks):
     recipes = load_recipes(recipe_df, raw_df)
     return master_df, recipes
 
+def add_food(new_food, all_food, already_have, ignored):
+    """
+    Adds food to all_food caring about things they already
+    have and updating ignored if so.
+
+    Parameters
+    ----------
+    new_food : Food
+        Food Item to add to the all_food.
+    all_food : dict
+        All the food currently in the shopping list.
+    already_have : set
+        Things to ignore.
+    ignored : dict
+        Currently ignored items.
+    """
+    if new_food.name.lower() in already_have:
+        if new_food.name in ignored:
+            ignored[new_food.name] += new_food.amount
+        else:
+            ignored[new_food.name] = new_food.amount
+            return
+    if new_food.name in all_food:
+        all_food[new_food.name] += new_food
+    else:
+        all_food[new_food.name] = new_food
+
 def create_shopping_list(items, master_df, recipes, already_have):
     """
     Builds the shopping list based on the items provided.
@@ -255,29 +285,37 @@ def create_shopping_list(items, master_df, recipes, already_have):
     #Grab a list of food names to build a list of needed recipes.
     food_names = list(items.keys())
     ignored = {}
+    ignored_recipes = []
     for name in food_names:
         #Dont look for it later in master
         if name in recipes:
             recipe = recipes[name]
             chosen_item = items.pop(name)
-            total_s = chosen_item.total_servings()
-            #Gurantees we always create whole numbers of recipes.
-            total_s = math.ceil(total_s*recipe.rec_per_serv)
+            if recipe.name.lower() in already_have:
+                ignored_recipes.append(recipe)
+                continue
+            item_servings = chosen_item.total_servings()
+            num_recipes = item_servings * recipe.rec_per_serv
+            #If there are more servings requested then the
+            #recipes (unit) servings then bump it up to another
+            #set of servings for that recipe (make 2 recipes instead of 1.)
+            servings_per_recipe = 1/recipe.rec_per_serv
+            #You always need at least one recipe.
+            if item_servings < servings_per_recipe:
+                num_recipes = 1
+            elif item_servings > servings_per_recipe:
+                remain = item_servings % servings_per_recipe
+                if remain >= 1:
+                    num_recipes += 1
+            #Make the number of recipes an integer.
+            num_recipes = int(num_recipes)
             for rec_ing in recipe.ingredients:
                 new_food = copy.copy(rec_ing)
                 new_food.days |= chosen_item.days
-                #Update the food item to the max of needed recipes.
-                new_food *= total_s
-                if new_food.name.lower() in already_have:
-                    if new_food.name in ignored:
-                        ignored[new_food.name] += new_food.amount
-                    else:
-                        ignored[new_food.name] = new_food.amount
-                    continue
-                if new_food.name in all_food:
-                    all_food[new_food.name] += new_food
-                else:
-                    all_food[new_food.name] = new_food
+                #Ensure the food is set to the number of
+                #requested recipes.
+                new_food *= num_recipes
+                add_food(new_food, all_food, already_have, ignored)
     #Now grab all remaining food items from the master df. Report any missing items
     #to the user.
     for chosen_name, chosen_item in items.items():
@@ -296,19 +334,13 @@ def create_shopping_list(items, master_df, recipes, already_have):
         #Update the days this food is needed.
         new_food.days |= chosen_item.days
         new_food *= total_s
-        if new_food.name.lower() in already_have:
-            if new_food.name in ignored:
-                ignored[new_food.name] += new_food.amount
-            else:
-                ignored[new_food.name] = new_food.amount
-                continue
-        if new_food.name in all_food:
-            all_food[new_food.name] += new_food
-        else:
-            all_food[new_food.name] = new_food
+        add_food(new_food, all_food, already_have, ignored)
     #Alert the user that we are ignoring these items.
     for food_name, amount in ignored.items():
         msg = f'Assuming already have {amount:.2f} of {food_name}'
+        logger.info(msg)
+    for recipe in ignored_recipes:
+        msg = f'Assuming already made recipe {recipe.name}'
         logger.info(msg)
     return all_food
 
