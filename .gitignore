@@ -3,4 +3,5 @@ __pycache__
 *.pyc
 *.txt
 .vscode/
-already_have.ini
+config.yml
+*.json

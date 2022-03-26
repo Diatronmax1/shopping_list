@@ -34,24 +34,25 @@ def load_food_plan(worksheet, used_days):
     dict
         Dictionary by day of pandas data frames.
     """
-    week_days = ('sunday',
-        'monday',
-        'tuesday',
-        'wednesday',
-        'thursday',
-        'friday',
-        'saturday',
+    week_days = ('Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
     )
     days = {}
     if worksheet is None:
         return days
-    use_all = not any(used_days)
+    use_all = used_days is None
     for sheet in worksheet:
-        name = sheet.title.lower()
-        if name in week_days:
-            if used_days.get(name) or use_all:
+        if sheet.title in week_days:
+            #If there is a dictionary it will contain
+            #false values for days that should be ignored.
+            if use_all or used_days.get(sheet.title, True):
                 data = sheet.get_all_values()
-                days[name] = pd.DataFrame(data)
+                days[sheet.title] = pd.DataFrame(data)
     return days
 
 def build_food_from_days(user_days):
@@ -80,10 +81,10 @@ def build_food_from_days(user_days):
         'Differences'
         )
     items = {}
-    for user_name, days in user_days.items():
+    for sheet_name, days in user_days.items():
         for day, food_sheet in days.items():
             for row, food_row in food_sheet.iterrows():
-                log_msg = f'{user_name} - {day} - row {row} -'
+                log_msg = f'{sheet_name} - {day} - row {row} -'
                 name = food_row[0]
                 qty_str = food_row[1]
                 if name == '' or qty_str == '':
@@ -95,7 +96,7 @@ def build_food_from_days(user_days):
                     unit_type = food_row[2]
                     gram_weight = food_row[12]
                 except KeyError as key_exc:
-                    msg = f'{log_msg} Failed to retreive values {key_exc}'
+                    msg = f'{log_msg} Failed to retrieve values {key_exc}'
                     logger.warning(msg)
                     continue
                 except ValueError:
@@ -282,7 +283,11 @@ def create_shopping_list(items, master_df, recipes, already_have):
                     shopping_list[ing.name] += new_food
             continue
         #Find the item in the master list.
-        master_series = master_df.loc[chosen_name]
+        try:
+            master_series = master_df.loc[chosen_name]
+        except KeyError:
+            msg = f'{chosen_name} cant be found in master list!'
+            logger.error(msg)
         new_food_name = master_series[0]
         new_qty_str = master_series[4]
         new_food_unit = master_series[5]
@@ -346,15 +351,16 @@ def build_groups(shopping_list):
     groups['No Category'] = no_group
     return groups
 
-def main(used_days, output_file='shopping_list.txt', string_io=None, already_have=None):
+def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_have=None):
     """
     Retrieves data from a google spreadsheet and
     creates a shopping list from it.
 
     Parameters
     ----------
-    user : str
-        User name for the sheet.
+    sheet_data : dict
+        Names of the sheets to open from google and the
+        days to use from those sheets.
     output_file : str, optional, default='test.txt'
         Output file to put the shopping list.
 
@@ -372,41 +378,26 @@ def main(used_days, output_file='shopping_list.txt', string_io=None, already_hav
         formatter = logging.Formatter('%(levelname)s - %(message)s')
         stream_handle.setFormatter(formatter)
         logger.addHandler(stream_handle)
-    if not any(used_days):
-        logger.info('Building sheet for all days')
-    else:
-        msg = f'Building sheet with {[day for day, used in used_days.items() if used]}'
-        logger.info(msg)
     scope = ['https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive']
     credentials = ServiceAccountCredentials.from_json_keyfile_name(
             'pers_key.json', scope) # Your json file here
     google_sheets = gspread.authorize(credentials)
     logger.info('Grabbing Chris food')
-    sheets = {}
-    try:
-        chris_plan = google_sheets.open('Chris Food Plan')
-        sheets['chris'] = chris_plan
-    except gspread.exceptions.APIError:
-        logger.exception('Unable to open Chris sheet!')
-        return
-    logger.info('Grabbing Melia food')
-    try:
-        melia_plan = google_sheets.open("Melia's Food Plan")
-        sheets['melia'] = melia_plan
-    except gspread.exceptions.APIError:
-        logger.exception('Unable to open Melias sheet!')
-        return
     days = {}
-    chris_days = load_food_plan(sheets.get('chris'), used_days)
-    if chris_days:
-        days['chris'] = chris_days
-    mel_days = load_food_plan(sheets.get('melia'), used_days)
-    if mel_days:
-        days['melia'] = mel_days
+    for name, used_days in sheet_data.items():
+        msg = f'Grabbing food from {name}'
+        logger.info(msg)
+        try:
+            sheet = google_sheets.open(name)
+        except gspread.exceptions.APIError:
+            msg = f'Unable to open {name}!'
+            logger.exception(msg)
+            return
+        days[name] = load_food_plan(sheet, used_days)
     logger.info('Grabbing master food list')
     master_df, recipes = load_food_list(google_sheets.open('Food List'))
-    logger.info('Combining chris and melia food')
+    logger.info('Combining food sheets')
     food_by_day = build_food_from_days(days)
     logger.info('Creating the food list')
     shopping_list = create_shopping_list(food_by_day, master_df, recipes, already_have)

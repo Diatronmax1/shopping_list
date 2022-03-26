@@ -1,7 +1,7 @@
 """
 Main application window to create shopping lists from.
 """
-from configparser import ConfigParser
+from functools import partial
 import os
 from pathlib import Path
 import time
@@ -20,14 +20,25 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMenu,
+    QMessageBox,
     QPushButton,
     QTextEdit,
     QWidget,
 )
 from PyQt5.QtGui import QTextCursor
 from PyQt5.QtCore import pyqtSignal, QObject, QThread
+import yaml
 
 import shopping_list
+
+DAYS = ('Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday'
+)
 
 class StringMonitor(QObject):
     """
@@ -65,8 +76,9 @@ class ShoppingWorker(QObject):
 
     Parameters
     ----------
-    days : list
-        List of days to run.
+    sheet_names : dict
+        Names of the sheets to load and the days
+        to use from them.
     out_file : Path
         The path to the output file.
     string_io : io.StringIO
@@ -77,9 +89,9 @@ class ShoppingWorker(QObject):
 
     finished = pyqtSignal()
 
-    def __init__(self, days, out_file, string_io, already_have):
+    def __init__(self, sheet_names, out_file, string_io, already_have):
         super().__init__()
-        self.days = days
+        self.sheet_names = sheet_names
         self.out_file = out_file
         self.string_io = string_io
         self.already_have = already_have
@@ -89,7 +101,7 @@ class ShoppingWorker(QObject):
         Builds the shopping list on a thread.
         """
         shopping_list.main(
-            self.days, self.out_file, self.string_io, self.already_have)
+            self.sheet_names, self.out_file, self.string_io, self.already_have)
         self.finished.emit()
 
 class HaveCheck(QCheckBox):
@@ -131,15 +143,15 @@ class AlreadyHave(QDialog):
     to be ignored.
     """
 
-    PATH = 'already_have.ini'
     MAX_ROWS = 10
 
-    def __init__(self, parent=None):
+    def __init__(self, parent, config_path):
         super().__init__(parent)
         self.setWindowTitle('Check boxes to modify values')
-        self.cfg = ConfigParser()
-        self.cfg.read(self.PATH)
-        self.check_config()
+        self.config_path = config_path
+        self.names = {}
+        with open(self.config_path, 'rb') as y_file:
+            self.names = yaml.load(y_file, yaml.Loader)['names']
         self.save_and_close = QPushButton('Save and Close')
         self.cancel_but = QPushButton('Cancel')
         self.create_new = QPushButton('New')
@@ -149,20 +161,12 @@ class AlreadyHave(QDialog):
         #Checkboxes.
         self.checks = QWidget()
         self.check_layout = QGridLayout(self.checks)
-        for name in self.cfg['Names']:
-            val = self.cfg['Names'].getboolean(name)
-            self.new_check(name, val)
+        for food, used in self.names.items():
+            self.new_check(food, used)
         #Main Layout
         self.main_layout = QGridLayout(self)
         self.resize(400,400)
         self.refresh_layout()
-
-    def check_config(self):
-        """
-        Makes sure there is a Names field.
-        """
-        if 'Names' not in self.cfg:
-            self.cfg['Names'] = {}
 
     def refresh_layout(self):
         """
@@ -226,7 +230,7 @@ class AlreadyHave(QDialog):
         new_name : str
             The new name for the dictionary.
         """
-        self.cfg['Names'].pop(widget.text())
+        self.names.pop(widget.text())
         self.take_check(widget)
         self.new_check(new_name, widget.isChecked())
         self.name_change(new_name, widget.isChecked())
@@ -255,7 +259,7 @@ class AlreadyHave(QDialog):
         widget : HaveCheck
             The widget to delete.
         """
-        self.cfg['Names'].pop(widget.text())
+        self.names.pop(widget.text())
         self.take_check(widget)
         self.refresh_layout()
 
@@ -270,14 +274,74 @@ class AlreadyHave(QDialog):
         is_checked : bool
             The state for the name.
         """
-        self.cfg['Names'][name] = str(is_checked)
+        self.names[name] = is_checked
 
     def accept(self):
         """
         Saves the cfg to the file.
         """
-        with open(self.PATH, 'w') as c_file:
-            self.cfg.write(c_file)
+        with open(self.config_path, 'rb') as y_file:
+            yml_dict = yaml.load(y_file, yaml.Loader)
+            yml_dict['names'] = self.names
+        with open(self.config_path, 'w') as y_file:
+            yaml.dump(yml_dict, y_file, yaml.Dumper)
+        super().accept()
+
+class SheetData(QDialog):
+    """
+    Spawns when a sheet name button is pressed. Allows
+    for fine control of days by sheet names.
+
+    Parameters
+    ----------
+    sheet_name_data : dict
+        The current sheet name data for this Sheet.
+
+    """
+
+    def __init__(self, parent, sheet_name):
+        super().__init__(parent)
+        self.sheet_name = sheet_name
+        with open(self.parent().PATH, 'rb') as y_file:
+            self.sheets = yaml.load(y_file, yaml.Loader)['sheets']
+            self.current_sheet = self.sheets[self.sheet_name]
+        layout = QFormLayout(self)
+        layout.addRow('Editing Sheet', QLabel(sheet_name))
+        for day in DAYS:
+            new_check = QCheckBox(day)
+            if self.current_sheet is None:
+                new_check.setChecked(True)
+            has_day = self.current_sheet.get(day)
+            if has_day is None:
+                new_check.setChecked(True)
+            else:
+                new_check.setChecked(has_day)
+            new_check.toggled.connect(partial(self.update_sheet, new_check))
+            layout.addWidget(new_check)
+        save_but = QPushButton('Save')
+        save_but.clicked.connect(self.accept)
+        layout.addWidget(save_but)
+
+    def update_sheet(self, check_box):
+        """
+        When a checkbox is checked it will tell us its state.
+        """
+        if self.current_sheet is None:
+            self.current_sheet = {}
+            self.sheets[self.sheet_name] = self.current_sheet
+        self.current_sheet[check_box.text()] = check_box.isChecked()
+        for thing in self.sheets:
+            print(thing, self.sheets[thing])
+
+    def accept(self):
+        """
+        Accepts and saves and closes the yaml.
+        """
+        with open(self.parent().PATH, 'rb') as y_file:
+            cur_yml = yaml.load(y_file, yaml.Loader)
+            cur_yml['sheets'] = self.sheets
+        with open(self.parent().PATH, 'w') as y_file:
+            yaml.dump(cur_yml, y_file, yaml.Dumper)
         super().accept()
 
 class MainWidget(QMainWindow):
@@ -293,26 +357,31 @@ class MainWidget(QMainWindow):
 
     """
 
+    PATH = Path('config.yml')
+
     def __init__(self, string_io):
         super().__init__()
         self.setWindowTitle('Shopping List Creator')
+        self.check_config()
+        with open(self.PATH, 'rb') as y_file:
+            cfg_dict = yaml.load(y_file, yaml.Loader)
+        self._threaded = cfg_dict['threaded']
         #Checkable days.
-        days = ('Sunday',
-            'Monday',
-            'Tuesday',
-            'Wednesday',
-            'Thursday',
-            'Friday',
-            'Saturday')
         self.already_haves = None
         already_have_act = QAction('Edit Already Haves', self)
         already_have_act.triggered.connect(self.edit_already_haves)
+        threaded_act = QAction('Threaded', self)
+        threaded_act.setCheckable(True)
+        threaded_act.setChecked(self._threaded)
+        threaded_act.toggled.connect(self.change_threaded_state)
         file_menu = self.menuBar().addMenu('File')
         file_menu.addAction(already_have_act)
+        edit_menu = self.menuBar().addMenu('Edit')
+        edit_menu.addAction(threaded_act)
         self.string_io = string_io
         self.button_group = QButtonGroup()
         self.button_group.setExclusive(False)
-        for day in days:
+        for day in DAYS:
             new_day = QCheckBox(day, self)
             self.button_group.addButton(new_day)
         #Name of the file.
@@ -328,24 +397,84 @@ class MainWidget(QMainWindow):
         self.shopping_worker = None
         self.mon_thread = None
         self.string_worker = None
+        #Contains sheet names and sets.
         self.generate_list_but = QPushButton('Generate List')
+        apply_all_but = QPushButton('Apply To All Sheets')
         #Signals
         self.generate_list_but.clicked.connect(self.make_shopping_list)
+        apply_all_but.clicked.connect(self.update_all_sheet_data)
         #Layout
         day_group = QGroupBox('Days')
         layout = QHBoxLayout(day_group)
         for button in self.button_group.buttons():
             button.setChecked(True)
             layout.addWidget(button)
+        layout.addWidget(apply_all_but)
+        sheet_group = QGroupBox('Sheets')
+        layout = QHBoxLayout(sheet_group)
+        for sheet_name in self.get_sheet_data():
+            new_button = QPushButton(sheet_name)
+            new_button.clicked.connect(partial(self.edit_sheet_data, sheet_name))
+            layout.addWidget(new_button)
         widget = QWidget()
         layout = QFormLayout(widget)
         layout.addRow('Select Days', day_group)
+        layout.addWidget(sheet_group)
         layout.addRow('FileName', self.file_name)
         layout.addRow('Output Directory', self.output_dir)
         layout.addRow('Status', self.status)
         layout.addWidget(self.generate_list_but)
         self.setCentralWidget(widget)
         self.edit_already_haves()
+
+    def change_threaded_state(self, state):
+        """
+        Modifies the threaded state.
+        """
+        self._threaded = state
+        with open(self.PATH, 'rb') as y_file:
+            yaml_dict = yaml.load(y_file, yaml.Loader)
+            yaml_dict['threaded'] = self._threaded
+        with open(self.PATH, 'w') as y_file:
+            yaml_dict = yaml.dump(yaml_dict, y_file, yaml.Dumper)
+
+    def edit_sheet_data(self, sheet_name):
+        """
+        Called when a button is pressed in the GUI spawns
+        the sheet editor.
+        """
+        dialog = SheetData(self, sheet_name)
+        dialog.open()
+
+    def update_all_sheet_data(self):
+        """
+        Casts all data from the main gui to each sheet name in the
+        configuration.
+        """
+        result = QMessageBox.information(
+            self,
+            'Update All',
+            'Warning this will update all current user sheet days!',
+            QMessageBox.Ok | QMessageBox.Cancel,
+            QMessageBox.Ok
+            )
+        if result == QMessageBox.Cancel:
+            return
+        #Now go through and update all sheet data to match
+        #the current buttons.
+        with open(self.PATH, 'rb') as y_file:
+            yml_dict = yaml.load(y_file, yaml.Loader)
+        sheets = yml_dict['sheets']
+        full_day_data = {}
+        for button in self.button_group.buttons():
+            full_day_data[button.text()] = button.isChecked()
+        #Now go over each sheet and set their data.
+        for sheet_name, day_data in sheets.items():
+            if day_data is None:
+                sheets[sheet_name] = {}
+            sheets[sheet_name] = full_day_data
+        with open(self.PATH, 'w') as y_file:
+            yaml.dump(yml_dict, y_file, yaml.Dumper)             
 
     def check_for_keyfile(self):
         """
@@ -371,7 +500,7 @@ class MainWidget(QMainWindow):
         """
         Creates the widget to modify already haves.
         """
-        self.already_haves = AlreadyHave(self.centralWidget())
+        self.already_haves = AlreadyHave(self.centralWidget(), self.PATH)
         self.already_haves.open()
 
     def update_status(self, new_value):
@@ -394,9 +523,6 @@ class MainWidget(QMainWindow):
         already_have = self.get_already_have()
         self.build_string_monitor()
         self.generate_list_but.setEnabled(False)
-        days = {}
-        for button in self.button_group.buttons():
-            days[button.text().lower()] = button.isChecked()
         file_name = os.path.splitext(self.file_name.text())[0] + '.txt'
         out_dir = Path(self.output_dir.text())
         out_file = out_dir / file_name
@@ -404,12 +530,29 @@ class MainWidget(QMainWindow):
             self.status.setText(f'Output dir does not exist! {out_dir}')
             return
         self.shop_thread = QThread()
-        self.shopping_worker = ShoppingWorker(
-            days, out_file, self.string_io, already_have)
-        self.shopping_worker.moveToThread(self.shop_thread)
-        self.shopping_worker.finished.connect(self.all_done)
-        self.shop_thread.started.connect(self.shopping_worker.run)
-        self.shop_thread.start()
+        sheet_data = self.get_sheet_data()
+        if self._threaded:
+            self.shopping_worker = ShoppingWorker(
+                sheet_data, out_file, self.string_io, already_have)
+            self.shopping_worker.moveToThread(self.shop_thread)
+            self.shopping_worker.finished.connect(self.all_done)
+            self.shop_thread.started.connect(self.shopping_worker.run)
+            self.shop_thread.start()
+        else:
+            shopping_list.main(sheet_data, out_file, self.string_io, already_have)
+
+    def get_sheet_data(self):
+        """
+        Goes through the available sheet names and checks the
+        states of their options.
+        """
+        with open(self.PATH, 'rb') as y_file:
+            yml_dict = yaml.load(y_file, yaml.Loader)
+            return yml_dict['sheets']
+
+    def check_config(self):
+        if not self.PATH.exists():
+            self.create_default_config()
 
     def get_already_have(self):
         """
@@ -421,18 +564,28 @@ class MainWidget(QMainWindow):
             The already have names that should be ignored.
         """
         already_have = set()
-        cfg = ConfigParser()
-        path = Path(AlreadyHave.PATH)
-        if not path.exists():
-            cfg['Names'] = {}
-            with open(path, 'w') as ini:
-                cfg.write(ini)
-        #Now read the path
-        cfg.read(path)
-        for name in cfg['Names']:
-            if cfg['Names'].getboolean(name):
+        with open(self.PATH, 'rb') as y_file:
+            yml_dict = yaml.load(y_file, yaml.Loader)
+        for name, food in yml_dict['names'].items():
+            if food:
                 already_have.add(name)
         return already_have
+
+    def create_default_config(self):
+        """
+        Builds the default configuration file.
+        """
+        default_names = (
+            'Chris Food Plan',
+            "Melia's Food Plan",
+            "Bryn's Food Plan")
+        yml_dict = {
+            'names': {},
+            'sheets' : {name:None for name in default_names},
+            'threaded':True,
+        }
+        with open(self.PATH, 'w') as y_file:
+            yaml.dump(yml_dict, y_file)
 
     def build_string_monitor(self):
         """
