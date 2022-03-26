@@ -241,7 +241,7 @@ def create_shopping_list(items, master_df, recipes, already_have):
         Contains all of the food information.
     recipes : dict
         Dictionary of recipes.
-    already_have : set, optional, default=None
+    already_have : set
         If provided, will skip items that we know we have.
 
     Returns
@@ -250,71 +250,66 @@ def create_shopping_list(items, master_df, recipes, already_have):
         A collection of foods with proper servings and
         units appended to them.
     """
-    if already_have is None:
-        already_have = set()
     logger = logging.getLogger(__name__)
     shopping_list = {}
-    for chosen_name, chosen_item in items.items():
-        total_s = chosen_item.total_servings()
-        total_g = chosen_item.total_grams()
-        #Get the item to add to the shopping list if in recipes.
-        recipe = recipes.get(chosen_name)
-        if recipe:
-            #If the number of items requested exceeds 1 recipe
-            #round up so that 2 recipe amounts are ordered.
-            total_recipes = math.ceil(total_s*recipe.rec_per_serv)
-            for ing in recipe.ingredients:
-                new_food = copy.copy(ing)
+    #Grab a list of food names to build a list of needed recipes.
+    food_names = list(items.keys())
+    ignored = {}
+    for name in food_names:
+        #Dont look for it later in master
+        if name in recipes:
+            recipe = recipes[name]
+            chosen_item = items.pop(name)
+            total_s = chosen_item.total_servings()
+            #Gurantees we always create whole numbers of recipes.
+            total_s = math.ceil(total_s*recipe.rec_per_serv)
+            for rec_ing in recipe.ingredients:
+                new_food = copy.copy(rec_ing)
                 new_food.days |= chosen_item.days
-                new_food *= total_recipes
-                ing_name = new_food.name.lower()
-                if ing_name in already_have:
-                    msg = f'Assuming already have {new_food.amount:.2f} of {ing_name}'
-                    logger.info(msg)
+                #Update the food item to the max of needed recipes.
+                new_food *= total_s
+                if new_food.name.lower() in already_have:
+                    if new_food.name in ignored:
+                        ignored[new_food.name] += new_food.amount
+                    else:
+                        ignored[new_food.name] = new_food.amount
                     continue
-                if new_food.name not in shopping_list:
-                    shopping_list[new_food.name] = new_food
-                else:
+                if new_food.name in shopping_list:
                     shopping_list[new_food.name] += new_food
-            continue
-        #Find the item in the master list.
-        try:
-            master_series = master_df.loc[chosen_name]
-        except KeyError:
+                else:
+                    shopping_list[new_food.name] = new_food
+    #Now grab all remaining food items from the master df. Report any missing items
+    #to the user.
+    for chosen_name, chosen_item in items.items():
+        if chosen_name not in master_df.index:
             msg = f'{chosen_name} cant be found in master list!'
             logger.exception(chosen_item.exc_str(msg))
-        new_food_name = master_series[0]
-        new_qty_str = master_series[4]
-        new_food_unit = master_series[5]
-        new_grams_str = master_series[6]
-        new_food_type = master_series[11]
+            continue
+        master_series = master_df.loc[chosen_name]
+        total_g = chosen_item.total_grams()
+        total_s = chosen_item.total_servings()
         try:
-            new_food_qty = float(new_qty_str)
-        except ValueError as exc1:
-            msg = f'Failed to convert {new_food_name} {new_qty_str} qty {exc1}'
-            if total_g is None or total_g == 0:
-                logger.warning(msg)
-                continue
-            try:
-                new_food_grams = float(new_grams_str)
-                new_food_qty = new_food_grams/total_g
-            except ValueError as exc2:
-                msg = f'{msg} {exc2}'
-                logger.exception(chosen_item.exc_str(msg))
-                continue
-        amount = new_food_qty * UREG(new_food_unit)
-        new_food = Food(new_food_name, amount, new_food_unit, new_food_type)
+            new_food = Food.from_masterlist(master_series, total_g, UREG)
+        except ValueError:
+            msg = f'Failed to convert {chosen_name} from master list'
+            logger.exception(chosen_item.exc_str(msg))
         #Update the days this food is needed.
         new_food.days |= chosen_item.days
         new_food *= total_s
         if new_food.name.lower() in already_have:
-            msg = f'Assuming already have {new_food.amount:.2f} of {new_food.name}'
-            logger.info(msg)
-            continue
-        if new_food.name not in shopping_list:
-            shopping_list[new_food.name] = new_food
-        else:
+            if new_food.name in ignored:
+                ignored[new_food.name] += new_food.amount
+            else:
+                ignored[new_food.name] = new_food.amount
+                continue
+        if new_food.name in shopping_list:
             shopping_list[new_food.name] += new_food
+        else:
+            shopping_list[new_food.name] = new_food
+    #Alert the user that we are ignoring these items.
+    for food_name, amount in ignored.items():
+        msg = f'Assuming already have {amount:.2f} of {food_name}'
+        logger.info(msg)
     return shopping_list
 
 def build_groups(shopping_list):

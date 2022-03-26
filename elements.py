@@ -22,13 +22,53 @@ class Food():
     food_type : str
         The type of food this is, used for categorizing
         the shopping_list
+
     """
+
     def __init__(self, name, amount, rec_unit, food_type):
         self.name = name
         self.amount = amount
         self.rec_unit = rec_unit
         self.food_type = food_type
         self.days = set()
+
+    @classmethod
+    def from_masterlist(cls, series, total_g, ureg):
+        """
+        Builds the food item from the master list
+        pandas dataframe.
+
+        Parameters
+        ----------
+        series : pd.Series
+            Series for the new Food item from Master.
+        total_g : float
+            The total number of grams for the food from
+            the chosen item if units are in grams.
+        ureg : UnitRegistry
+            Provided to keep one instance of the units
+            registry alive.
+
+        Returns
+        -------
+        Food
+            The created food item.
+        """
+        name = series[0]
+        qty_str = series[4]
+        food_unit = series[5]
+        grams_str = series[6]
+        food_type = series[11]
+        try:
+            food_qty = float(qty_str)
+        except ValueError as exc1:
+            msg = f'Failed to convert {name} {qty_str} qty {exc1}'
+            if total_g is None or total_g == 0:
+                raise ValueError(msg) from exc1
+            food_grams = float(grams_str)
+            food_qty = food_grams/total_g
+        amount = food_qty * ureg(food_unit)
+        return cls(name, amount, food_unit, food_type)
 
     def day_shortstr(self):
         """
