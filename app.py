@@ -34,14 +34,21 @@ import yaml
 
 import shopping_list
 
-DAYS = ('Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday'
-)
+#Prep for all Day -> datetime conversions.
+DAYS = {}
+
+def build_days():
+    """
+    Creates 7 days and adds them to the global
+    DAYS dictionary.
+    """
+    global DAYS
+    today = dt.date.today()
+    for num in range(7):
+        day = today + dt.timedelta(days=num)
+        DAYS[day.strftime("%A")] = day
+
+build_days()
 
 class StringMonitor(QObject):
     """
@@ -68,6 +75,9 @@ class StringMonitor(QObject):
         """
         while self.alive:
             time.sleep(0.5)
+            if self.monitor_str.closed:
+                self.alive = False
+                break
             value = self.monitor_str.getvalue()
             if value != self.cur_len:
                 self.string_changed.emit(value)
@@ -297,52 +307,52 @@ class SheetData(QDialog):
 
     Parameters
     ----------
-    sheet_name_data : dict
-        The current sheet name data for this Sheet.
+    parent : QWidget
+        Parent widget, should contain the config path.
+    sheet_name : str
+        The name of the sheet to modify.
 
     """
 
     def __init__(self, parent, sheet_name):
         super().__init__(parent)
         self.sheet_name = sheet_name
-        with open(self.parent().PATH, 'rb') as y_file:
-            self.sheets = yaml.load(y_file, yaml.Loader)['sheets']
-            self.current_sheet = self.sheets[self.sheet_name]
+        self.sheets = self.parent().get_sheet_data()
+        self.current_sheet = self.sheets[self.sheet_name]
         layout = QFormLayout(self)
         layout.addRow('Editing Sheet', QLabel(sheet_name))
+        used_days = {day.strftime("%A") for day in self.current_sheet}
+        self._checks = []
         for day in DAYS:
             new_check = QCheckBox(day)
-            if self.current_sheet is None:
+            if not any(used_days) or day in used_days:
                 new_check.setChecked(True)
-            has_day = self.current_sheet.get(day)
-            if has_day is None:
-                new_check.setChecked(True)
-            else:
-                new_check.setChecked(has_day)
-            new_check.toggled.connect(partial(self.update_sheet, new_check))
             layout.addWidget(new_check)
+            self._checks.append(new_check)
         save_but = QPushButton('Save')
         save_but.clicked.connect(self.accept)
         layout.addWidget(save_but)
-
-    def update_sheet(self, check_box):
-        """
-        When a checkbox is checked it will tell us its state.
-        """
-        if self.current_sheet is None:
-            self.current_sheet = {}
-            self.sheets[self.sheet_name] = self.current_sheet
-        self.current_sheet[check_box.text()] = check_box.isChecked()
-        for thing in self.sheets:
-            print(thing, self.sheets[thing])
 
     def accept(self):
         """
         Accepts and saves and closes the yaml.
         """
+        #Convert the sheets data to yaml format.
+        use_all = True
+        for check in self._checks:
+            use_all &= check.isChecked()
+            if check.isChecked():
+                self.current_sheet.add(DAYS[check.text()])
+        #Clear them all if using them all.
+        if use_all:
+            self.current_sheet.clear()
+        #Update the current sheet.
+        save_sheets = {}
+        for sheet_name, used_days in self.sheets.items():
+            save_sheets[sheet_name] = [day.strftime('%A') for day in used_days]
         with open(self.parent().PATH, 'rb') as y_file:
             cur_yml = yaml.load(y_file, yaml.Loader)
-            cur_yml['sheets'] = self.sheets
+            cur_yml['sheets'] = save_sheets
         with open(self.parent().PATH, 'w') as y_file:
             yaml.dump(cur_yml, y_file, yaml.Dumper)
         super().accept()
@@ -370,7 +380,6 @@ class MainWidget(QMainWindow):
             cfg_dict = yaml.load(y_file, yaml.Loader)
         self._threaded = cfg_dict['threaded']
         #Checkable days.
-        today = dt.date.today()
         self.already_haves = None
         already_have_act = QAction('Edit Already Haves', self)
         already_have_act.triggered.connect(self.edit_already_haves)
@@ -385,10 +394,9 @@ class MainWidget(QMainWindow):
         self.string_io = string_io
         self.button_group = QButtonGroup()
         self.button_group.setExclusive(False)
-        for day_num in range(7):
-            day = today + dt.timedelta(days=day_num)
-            new_day = QCheckBox(day.strftime('%A (%m/%d)'), self)
-            self.button_group.addButton(new_day)
+        for day in DAYS.values():
+            new_check = QCheckBox(day.strftime('%A (%m/%d)'), self)
+            self.button_group.addButton(new_check)
         #Name of the file.
         self.file_name = QLineEdit()
         self.file_name.setText('shopping_list')
@@ -432,6 +440,7 @@ class MainWidget(QMainWindow):
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.addWidget(day_group)
+        layout.addWidget(sheet_group)
         layout.addWidget(name_line)
         layout.addWidget(out_line)
         layout.addWidget(QLabel('Status'))
@@ -475,17 +484,24 @@ class MainWidget(QMainWindow):
             return
         #Now go through and update all sheet data to match
         #the current buttons.
-        with open(self.PATH, 'rb') as y_file:
-            yml_dict = yaml.load(y_file, yaml.Loader)
-        sheets = yml_dict['sheets']
-        full_day_data = {}
+        sheets = self.get_sheet_data()
+        fmt_days = {day.strftime('%A (%m/%d)'):day.strftime("%A") for day in DAYS.values()}
+        update_days = set()
+        use_all = True
         for button in self.button_group.buttons():
-            full_day_data[button.text()] = button.isChecked()
-        #Now go over each sheet and set their data.
-        for sheet_name, day_data in sheets.items():
-            if day_data is None:
-                sheets[sheet_name] = {}
-            sheets[sheet_name] = full_day_data
+            if button.isChecked():
+                update_days.add(fmt_days[button.text()])
+            else:
+                use_all = False
+        if use_all:
+            update_days.clear()
+        #Now go over each sheet and reset their data.
+        for sheet_name in sheets:
+            sheets[sheet_name] = list(update_days)
+        #Now convert for writing.
+        with open(self.PATH, 'r') as y_file:
+            yml_dict = yaml.load(y_file, yaml.Loader)
+            yml_dict['sheets'] = sheets
         with open(self.PATH, 'w') as y_file:
             yaml.dump(yml_dict, y_file, yaml.Dumper)
 
@@ -536,7 +552,6 @@ class MainWidget(QMainWindow):
         already_have = self.get_already_have()
         self.build_string_monitor()
         self.generate_list_but.setEnabled(False)
-        days = []
         file_name = os.path.splitext(self.file_name.text())[0] + '.txt'
         out_dir = Path(self.output_dir.text())
         out_file = out_dir / file_name
@@ -544,7 +559,7 @@ class MainWidget(QMainWindow):
             self.status.setText(f'Output dir does not exist! {out_dir}')
             return
         self.shop_thread = QThread()
-        sheet_data = self.get_sheet_data()
+        sheet_data = self.get_sheet_data(True)
         if self._threaded:
             self.shopping_worker = ShoppingWorker(
                 sheet_data, out_file, self.string_io, already_have)
@@ -554,36 +569,39 @@ class MainWidget(QMainWindow):
             self.shop_thread.start()
         else:
             shopping_list.main(sheet_data, out_file, self.string_io, already_have)
+            self.all_done()
 
-    def get_sheet_data(self):
+    def get_sheet_data(self, ignore_used_days_empty=False):
         """
         Goes through the available sheet names and checks the
         states of their options.
+
+        Parameters
+        ----------
+        ignore_used_days_empty : bool, optional, default=False
+            Will treat an emtpy set of days as requesting
+            all days, used mainly for normal shopping.
         """
         with open(self.PATH, 'rb') as y_file:
             yml_dict = yaml.load(y_file, yaml.Loader)
             sheets = yml_dict['sheets']
-        #Buttons always start with today.
-        today = dt.date.today()
-        days = set()
-        for num in range(7):
-            day = today + dt.timedelta(days=num)
-            days.add(day)
         fixed_sheets = {}
         for sheet_name, used_days in sheets.items():
             partial_days = set()
-            if used_days is None:
-                #Just set all the days.
-                partial_days |= days
-            else:
-                for day in days:
-                    if used_days.get(day.strftime("%A"), False):
-                        partial_days.add(day)
+            if used_days:
+                for day in used_days:
+                    #Grab the day from the global dict.
+                    partial_days.add(DAYS[day])
+            elif ignore_used_days_empty:
+                partial_days.update(day for day in DAYS.values())
             fixed_sheets[sheet_name] = partial_days
         #Then update the fixed sheets as the return.
         return fixed_sheets
 
     def check_config(self):
+        """
+        Validates the config path.
+        """
         if not self.PATH.exists():
             self.create_default_config()
 
@@ -599,8 +617,8 @@ class MainWidget(QMainWindow):
         already_have = set()
         with open(self.PATH, 'rb') as y_file:
             yml_dict = yaml.load(y_file, yaml.Loader)
-        for name, food in yml_dict['names'].items():
-            if food:
+        for name, use in yml_dict['names'].items():
+            if use:
                 already_have.add(name)
         return already_have
 
@@ -637,7 +655,8 @@ class MainWidget(QMainWindow):
         Close the string monitor and re-enable the list
         generator.
         """
-        self.string_worker.alive = False
+        if self.string_worker:
+            self.string_worker.alive = False
         self.mon_thread.quit()
         self.mon_thread.wait()
         self.shop_thread.quit()

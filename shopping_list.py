@@ -354,7 +354,7 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
     ----------
     sheet_data : dict
         Names of the sheets to open from google and the
-        days to use from those sheets.
+        days as datetimes to use from those sheets.
     output_file : str, optional, default='test.txt'
         Output file to put the shopping list.
 
@@ -422,9 +422,3 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
             s_file.write('\n')
     msg = f'File Created {output_file}'
     logger.info(msg)
-
-if __name__ == '__main__':
-    F_NAME = 'shopping_list.txt'
-    day = dt.date.today()
-    used_days = (day + dt.timedelta(days=num) for num in range(7))
-    main((), F_NAME, already_have=set(['cumin']))
