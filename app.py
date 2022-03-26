@@ -1,6 +1,8 @@
 """
 Main application window to create shopping lists from.
 """
+#pylint: disable=unspecified-encoding, invalid-name
+import datetime as dt
 from functools import partial
 import os
 from pathlib import Path
@@ -23,6 +25,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QTextEdit,
+    QVBoxLayout,
     QWidget,
 )
 from PyQt5.QtGui import QTextCursor
@@ -175,10 +178,10 @@ class AlreadyHave(QDialog):
         for _ in range(self.main_layout.count()):
             layout_item = self.main_layout.takeAt(0)
             layout_item.widget().setParent(None)
-        self.main_layout.addWidget(self.checks, 0, 0, 2, 1)
-        self.main_layout.addWidget(self.create_new, 1, 1)
-        self.main_layout.addWidget(self.save_and_close, 2, 0)
-        self.main_layout.addWidget(self.cancel_but, 2, 1)
+        self.main_layout.addWidget(self.create_new,     0, 1)
+        self.main_layout.addWidget(self.checks,         1, 0, 2, 1)
+        self.main_layout.addWidget(self.cancel_but,     2, 0)
+        self.main_layout.addWidget(self.save_and_close, 2, 1)
 
     def new_check(self, name, val):
         """
@@ -367,6 +370,7 @@ class MainWidget(QMainWindow):
             cfg_dict = yaml.load(y_file, yaml.Loader)
         self._threaded = cfg_dict['threaded']
         #Checkable days.
+        today = dt.date.today()
         self.already_haves = None
         already_have_act = QAction('Edit Already Haves', self)
         already_have_act.triggered.connect(self.edit_already_haves)
@@ -381,8 +385,9 @@ class MainWidget(QMainWindow):
         self.string_io = string_io
         self.button_group = QButtonGroup()
         self.button_group.setExclusive(False)
-        for day in DAYS:
-            new_day = QCheckBox(day, self)
+        for day_num in range(7):
+            day = today + dt.timedelta(days=day_num)
+            new_day = QCheckBox(day.strftime('%A (%m/%d)'), self)
             self.button_group.addButton(new_day)
         #Name of the file.
         self.file_name = QLineEdit()
@@ -416,13 +421,21 @@ class MainWidget(QMainWindow):
             new_button = QPushButton(sheet_name)
             new_button.clicked.connect(partial(self.edit_sheet_data, sheet_name))
             layout.addWidget(new_button)
+        name_line = QWidget()
+        layout = QHBoxLayout(name_line)
+        layout.addWidget(QLabel('File name'))
+        layout.addWidget(self.file_name)
+        out_line = QWidget()
+        layout = QHBoxLayout(out_line)
+        layout.addWidget(QLabel('Output Directory'))
+        layout.addWidget(self.output_dir)
         widget = QWidget()
-        layout = QFormLayout(widget)
-        layout.addRow('Select Days', day_group)
-        layout.addWidget(sheet_group)
-        layout.addRow('FileName', self.file_name)
-        layout.addRow('Output Directory', self.output_dir)
-        layout.addRow('Status', self.status)
+        layout = QVBoxLayout(widget)
+        layout.addWidget(day_group)
+        layout.addWidget(name_line)
+        layout.addWidget(out_line)
+        layout.addWidget(QLabel('Status'))
+        layout.addWidget(self.status)
         layout.addWidget(self.generate_list_but)
         self.setCentralWidget(widget)
         self.edit_already_haves()
@@ -474,7 +487,7 @@ class MainWidget(QMainWindow):
                 sheets[sheet_name] = {}
             sheets[sheet_name] = full_day_data
         with open(self.PATH, 'w') as y_file:
-            yaml.dump(yml_dict, y_file, yaml.Dumper)             
+            yaml.dump(yml_dict, y_file, yaml.Dumper)
 
     def check_for_keyfile(self):
         """
@@ -523,6 +536,7 @@ class MainWidget(QMainWindow):
         already_have = self.get_already_have()
         self.build_string_monitor()
         self.generate_list_but.setEnabled(False)
+        days = []
         file_name = os.path.splitext(self.file_name.text())[0] + '.txt'
         out_dir = Path(self.output_dir.text())
         out_file = out_dir / file_name
@@ -548,7 +562,26 @@ class MainWidget(QMainWindow):
         """
         with open(self.PATH, 'rb') as y_file:
             yml_dict = yaml.load(y_file, yaml.Loader)
-            return yml_dict['sheets']
+            sheets = yml_dict['sheets']
+        #Buttons always start with today.
+        today = dt.date.today()
+        days = set()
+        for num in range(7):
+            day = today + dt.timedelta(days=num)
+            days.add(day)
+        fixed_sheets = {}
+        for sheet_name, used_days in sheets.items():
+            partial_days = set()
+            if used_days is None:
+                #Just set all the days.
+                partial_days |= days
+            else:
+                for day in days:
+                    if used_days.get(day.strftime("%A"), False):
+                        partial_days.add(day)
+            fixed_sheets[sheet_name] = partial_days
+        #Then update the fixed sheets as the return.
+        return fixed_sheets
 
     def check_config(self):
         if not self.PATH.exists():

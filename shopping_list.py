@@ -3,6 +3,7 @@ Generates a text file of shopping list items based
 on the sheets created on google drive for Food.
 """
 import copy
+import datetime as dt
 import os
 from pathlib import Path
 import logging
@@ -28,31 +29,24 @@ def load_food_plan(worksheet, used_days):
     ----------
     worksheet : gspread.models.Spreadsheet
         The worksheet to read the days from.
+    used_days : tuple
+        Desired days from the sheet.
 
     Returns
     -------
     dict
         Dictionary by day of pandas data frames.
     """
-    week_days = ('Sunday',
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
-        'Saturday',
-    )
+    str_days = {day.strftime('%A').lower():day for day in used_days}
     days = {}
     if worksheet is None:
         return days
-    use_all = used_days is None
     for sheet in worksheet:
-        if sheet.title in week_days:
-            #If there is a dictionary it will contain
-            #false values for days that should be ignored.
-            if use_all or used_days.get(sheet.title, True):
-                data = sheet.get_all_values()
-                days[sheet.title] = pd.DataFrame(data)
+        sheet_name = sheet.title.lower()
+        sheet_day = str_days.get(sheet_name.lower())
+        if sheet_day:
+            data = sheet.get_all_values()
+            days[sheet_day] = pd.DataFrame(data)
     return days
 
 def build_food_from_days(user_days):
@@ -383,7 +377,6 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
     credentials = ServiceAccountCredentials.from_json_keyfile_name(
             'pers_key.json', scope) # Your json file here
     google_sheets = gspread.authorize(credentials)
-    logger.info('Grabbing Chris food')
     days = {}
     for name, used_days in sheet_data.items():
         msg = f'Grabbing food from {name}'
@@ -404,7 +397,23 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
     shopping_list = list(shopping_list.values())
     shopping_list.sort()
     shopping_groups = build_groups(shopping_list)
+    today = dt.date.today()
     with open(output_file, 'w+', encoding='utf-8') as s_file:
+        first_line = ''
+        second_line = ''
+        for day_num in range(7):
+            day = today + dt.timedelta(days=day_num)
+            end = ' '
+            if day_num == 6:
+                end = ''
+            day_block = f"{day.strftime('%A')}{end}"
+            first_line += day_block
+            date_block = day.strftime('%m/%d')
+            add_len = len(day_block) - len(date_block)
+            date_block += ' '*add_len
+            second_line += date_block
+        s_file.write(first_line + '\n')
+        s_file.write(second_line + '\n\n')
         for group_name, food_list in shopping_groups.items():
             s_file.write(group_name + '\n')
             s_file.write('-'*len(group_name) + '\n')
@@ -416,4 +425,6 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
 
 if __name__ == '__main__':
     F_NAME = 'shopping_list.txt'
-    main({}, F_NAME, already_have=set(['cumin']))
+    day = dt.date.today()
+    used_days = (day + dt.timedelta(days=num) for num in range(7))
+    main((), F_NAME, already_have=set(['cumin']))
