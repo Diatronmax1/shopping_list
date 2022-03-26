@@ -125,13 +125,20 @@ class ChosenItem():
 
     def __init__(self, name):
         self.name = name
+        self.sheets = set()
         self.servings = 0
         self.grams = 0
-        self.gram_per_serv = None
+        self.serv_weight_as_grams = None
         self.days = set()
 
     def __str__(self):
         return f'{self.name} {self.total_servings()} servings'
+
+    def exc_str(self, msg=''):
+        """
+        Returns a formatted info string for exceptions.
+        """
+        return msg + f" {self.sheets} {[day.strftime('%a') for day in self.days]}"
 
     def add_servings(self, servings):
         """
@@ -144,7 +151,7 @@ class ChosenItem():
         """
         self.servings += servings
 
-    def add_grams(self, grams, gram_weight):
+    def add_grams(self, grams, serv_weight_as_grams):
         """
         Updates grams.
 
@@ -154,7 +161,7 @@ class ChosenItem():
             Number of grams to add to this item.
         """
         self.grams += grams
-        self.gram_per_serv = gram_weight
+        self.serv_weight_as_grams = serv_weight_as_grams
 
     def total_servings(self):
         """
@@ -167,8 +174,8 @@ class ChosenItem():
             Number of servings for this item.
         """
         start_serv = self.servings
-        if self.gram_per_serv:
-            start_serv += self.grams/self.gram_per_serv
+        if self.serv_weight_as_grams:
+            start_serv += self.grams/self.serv_weight_as_grams
         return start_serv
 
     def total_grams(self):
@@ -180,9 +187,9 @@ class ChosenItem():
         float
             Number of grams for this item.
         """
-        if self.gram_per_serv is None:
+        if self.serv_weight_as_grams is None:
             return
         start_grams = self.grams
-        if self.servings and self.gram_per_serv:
-            start_grams += self.servings * self.gram_per_serv
+        if self.servings and self.serv_weight_as_grams:
+            start_grams += self.servings * self.serv_weight_as_grams
         return start_grams

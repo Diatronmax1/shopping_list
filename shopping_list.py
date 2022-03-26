@@ -88,7 +88,7 @@ def build_food_from_days(user_days):
                 try:
                     qty = float(qty_str)
                     unit_type = food_row[2]
-                    gram_weight = food_row[12]
+                    serv_weight_as_grams = food_row[11]
                 except KeyError as key_exc:
                     msg = f'{log_msg} Failed to retrieve values {key_exc}'
                     logger.warning(msg)
@@ -104,22 +104,23 @@ def build_food_from_days(user_days):
                     if item is None:
                         item = ChosenItem(name)
                         new_item = True
+                    item.sheets.add(sheet_name)
                     item.days.add(day)
                     if unit_type == 'grams':
-                        if gram_weight == '':
+                        if serv_weight_as_grams == '':
                             continue
                         try:
-                            gram_weight = float(gram_weight)
+                            serv_weight_as_grams = float(serv_weight_as_grams)
                         except ValueError:
-                            msg = f'Failed to convert {name} gram_weight {gram_weight}'
-                            logger.warning(msg)
+                            msg = f'Failed to convert {name} serv_weight (g) {serv_weight_as_grams}'
+                            logger.exception(item.exc_str(msg))
                             continue
-                        item.add_grams(qty, gram_weight)
+                        item.add_grams(qty, serv_weight_as_grams)
                     elif unit_type == 'servings':
                         item.add_servings(qty)
                     else:
                         msg = f'Unrecognized unit_type {unit_type} for {name}'
-                        logger.warning(msg)
+                        logger.warning(item.exc_str(msg))
                         continue
                     if new_item:
                         items[name] = item
@@ -271,17 +272,17 @@ def create_shopping_list(items, master_df, recipes, already_have):
                     msg = f'Assuming already have {new_food.amount:.2f} of {ing_name}'
                     logger.info(msg)
                     continue
-                if ing.name not in shopping_list:
-                    shopping_list[ing.name] = new_food
+                if new_food.name not in shopping_list:
+                    shopping_list[new_food.name] = new_food
                 else:
-                    shopping_list[ing.name] += new_food
+                    shopping_list[new_food.name] += new_food
             continue
         #Find the item in the master list.
         try:
             master_series = master_df.loc[chosen_name]
         except KeyError:
             msg = f'{chosen_name} cant be found in master list!'
-            logger.error(msg)
+            logger.exception(chosen_item.exc_str(msg))
         new_food_name = master_series[0]
         new_qty_str = master_series[4]
         new_food_unit = master_series[5]
@@ -299,7 +300,7 @@ def create_shopping_list(items, master_df, recipes, already_have):
                 new_food_qty = new_food_grams/total_g
             except ValueError as exc2:
                 msg = f'{msg} {exc2}'
-                logger.warning(msg)
+                logger.exception(chosen_item.exc_str(msg))
                 continue
         amount = new_food_qty * UREG(new_food_unit)
         new_food = Food(new_food_name, amount, new_food_unit, new_food_type)
