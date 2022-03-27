@@ -2,7 +2,6 @@
 Main application window to create shopping lists from.
 """
 #pylint: disable=unspecified-encoding, invalid-name
-from asyncio import subprocess
 from functools import partial
 import os
 import subprocess
