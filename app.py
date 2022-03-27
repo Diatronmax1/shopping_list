@@ -34,7 +34,7 @@ import shopping_list
 import already_have
 from dynamic_sheet import DynamicSheet
 import sheet_days
-from core import DAYS, CFG_PATH
+from core import DAYS, CFG_PATH, check_keyfile, change_keyfile
 from workers import StringMonitor, ShoppingWorker
 
 class MainWidget(QMainWindow):
@@ -95,7 +95,7 @@ class MainWidget(QMainWindow):
             layout.addWidget(button)
         layout.addWidget(apply_all_but)
         sheet_group = QGroupBox('Sheets')
-        layout = QHBoxLayout(sheet_group)
+        layout = QVBoxLayout(sheet_group)
         self.sheet_day_buttons = QButtonGroup()
         self.sheet_day_buttons.setExclusive(False)
         for sheet_name, button_name in sheet_days.sheets_with_daystrings().items():
@@ -238,15 +238,14 @@ class MainWidget(QMainWindow):
         FileNotFoundError
             When the keyfile isn't setup correctly.
         """
-        keyfile = Path('pers_key.json')
-        if not keyfile.exists():
+        if not check_keyfile():
             key_text, ok_pressed = QInputDialog.getText(self,
                 'No Key File detected, create new',
                 'Key:')
             if key_text and ok_pressed:
-                with open(keyfile, 'w') as k_file:
-                    k_file.write(key_text)
-        if not keyfile.exists():
+                change_keyfile(key_text)
+        #Now if it still doesn't exist, crash.
+        if not check_keyfile():
             raise FileNotFoundError('Must have a key file to continue!')
 
     def edit_already_haves(self):

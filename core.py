@@ -5,10 +5,13 @@ Provides utility functions to maintain the current days in the file.
 import datetime as dt
 from pathlib import Path
 
+from oauth2client.service_account import ServiceAccountCredentials as sac
+
 import yaml
 
 
 CFG_PATH = Path('config.yml')
+KEY_PATH = Path.home() / 'shopping_list_key.json'
 DAYS = {}
 _sheet_names = (
     'Chris Food Plan',
@@ -52,6 +55,36 @@ def check_config():
             yaml.dump(yml_dict, y_file, yaml.Dumper)
     else:
         create_default_config()
+
+def check_keyfile():
+    """
+    Verifies the existence of the keyfile.
+
+    Returns
+    -------
+    bool
+    """
+    return KEY_PATH.exists()
+
+def change_keyfile(key_text):
+    """
+    Updates and creates a keyfile.
+    """
+    with open(KEY_PATH, 'w') as k_file:
+        k_file.write(key_text)
+
+def get_credentials():
+    """
+    Retrieves the google api credentials.
+
+    Returns
+    -------
+    ServiceAccountCredentials
+    """
+    scope = ['https://spreadsheets.google.com/feeds',
+            'https://www.googleapis.com/auth/drive']
+    credentials = sac.from_json_keyfile_name(KEY_PATH, scope)
+    return credentials
 
 check_config()
 build_days()

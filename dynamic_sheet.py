@@ -62,20 +62,17 @@ class DynamicSheet(QDialog):
         hoz_head = self.table_widget.horizontalHeader()
         hoz_head.setSectionResizeMode(0, QHeaderView.Stretch)
         hoz_head.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.table_widget.cellClicked.connect(self.ignore_food)
+        self.table_widget.itemClicked.connect(self.ignore_food)
 
-    def ignore_food(self, row, col):
+    def ignore_food(self, table_item):
         """
         Should try to ignore this food for the user.
         """
-        if col != 1:
-            return
-        cell = self.table_widget.item(row, col)
-        if cell and cell.checkState() == Qt.Checked:
-            return
-        food = cell.data(Qt.UserRole)
-        cell.setCheckState(Qt.Checked)
-        names = get_names()
-        names[food.name.lower()] = True
-        write_names(names)
-        self.parent()._shopping_list.pop(food.name)
+        table_item.setCheckState(Qt.Checked)
+        food = table_item.data(Qt.UserRole)
+        #If the name is still in the shopping list
+        if food.name in self.parent()._shopping_list:
+            names = get_names()
+            names[food.name.lower()] = True
+            write_names(names)
+            self.parent()._shopping_list.pop(food.name)

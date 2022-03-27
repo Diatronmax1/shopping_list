@@ -9,10 +9,10 @@ from pathlib import Path
 import logging
 
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from pint import UnitRegistry
 
+import core
 import elements
 
 os.chdir(Path(__file__).parent)
@@ -405,11 +405,8 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
         formatter = logging.Formatter('%(levelname)s - %(message)s')
         stream_handle.setFormatter(formatter)
         logger.addHandler(stream_handle)
-    scope = ['https://spreadsheets.google.com/feeds',
-            'https://www.googleapis.com/auth/drive']
-    credentials = ServiceAccountCredentials.from_json_keyfile_name(
-            'pers_key.json', scope) # Your json file here
-    google_sheets = gspread.authorize(credentials)
+    
+    google_sheets = gspread.authorize(core.get_credentials())
     days = {}
     for name, used_days in sheet_data.items():
         msg = f'Grabbing food from {name}'
