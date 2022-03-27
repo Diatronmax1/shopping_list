@@ -2,10 +2,11 @@
 Main application window to create shopping lists from.
 """
 #pylint: disable=unspecified-encoding, invalid-name
+from asyncio import subprocess
 from functools import partial
 import os
+import subprocess
 from pathlib import Path
-
 
 from PyQt5.QtWidgets import (
     QAction,
@@ -158,7 +159,10 @@ class MainWidget(QMainWindow):
         if not shop_file.exists():
             QMessageBox.information(self, 'Open File', f'{shop_file} does not exist!')
             return
-        os.startfile(shop_file)
+        if os.name == 'nt':
+            os.startfile(shop_file)
+        else:
+            subprocess.Popen(['open', '-W', shop_file])
 
     def open_dynamic_sheet(self):
         """
