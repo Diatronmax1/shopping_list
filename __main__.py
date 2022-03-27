@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Main entry point for the shopping list application.
 """
