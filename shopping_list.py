@@ -7,14 +7,13 @@ import datetime as dt
 import os
 from pathlib import Path
 import logging
-import math
 
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from pint import UnitRegistry
 
-from elements import ChosenItem, Food, Recipe
+import elements
 
 os.chdir(Path(__file__).parent)
 
@@ -102,7 +101,7 @@ def build_food_from_days(user_days):
                     new_item = False
                     item = items.get(name)
                     if item is None:
-                        item = ChosenItem(name)
+                        item = elements.ChosenItem(name)
                         new_item = True
                     item.sheets.add(sheet_name)
                     item.days.add(day)
@@ -157,7 +156,7 @@ def load_recipes(recipe_df, raw_df):
             recipe_series = recipe_df.iloc[idx+1]
             recipe_name = recipe_series[0]
             rec_per_serv = float(recipe_series[6])
-            cur_recipe = Recipe(recipe_name, rec_per_serv)
+            cur_recipe = elements.Recipe(recipe_name, rec_per_serv)
         if start_track:
             if first_col:
                 raw_ing_series = raw_df.loc[first_col]
@@ -177,7 +176,7 @@ def load_recipes(recipe_df, raw_df):
                 #Grab the preferred unit from the recipe.
                 rec_unit = series[2]
                 food_type = raw_ing_series['Food Type']
-                new_food = Food(ing_name, amount, rec_unit, food_type)
+                new_food = elements.Food(ing_name, amount, rec_unit, food_type)
                 new_food *= serv_amt
                 cur_recipe.append(new_food)
         #So the next time in the loop we will look for ingredient names.
@@ -286,11 +285,14 @@ def create_shopping_list(items, master_df, recipes, already_have):
     food_names = list(items.keys())
     ignored = {}
     ignored_recipes = []
+    recipe_list = []
     for name in food_names:
         #Dont look for it later in master
         if name in recipes:
             recipe = recipes[name]
             chosen_item = items.pop(name)
+            recipe.days |= chosen_item.days
+            recipe_list.append(recipe)
             if recipe.name.lower() in already_have:
                 ignored_recipes.append(recipe)
                 continue
@@ -327,7 +329,7 @@ def create_shopping_list(items, master_df, recipes, already_have):
         total_g = chosen_item.total_grams()
         total_s = chosen_item.total_servings()
         try:
-            new_food = Food.from_masterlist(master_series, total_g, UREG)
+            new_food = elements.Food.from_masterlist(master_series, total_g, UREG)
         except ValueError:
             msg = f'Failed to convert {chosen_name} from master list'
             logger.exception(chosen_item.exc_str(msg))
@@ -342,7 +344,7 @@ def create_shopping_list(items, master_df, recipes, already_have):
     for recipe in ignored_recipes:
         msg = f'Assuming already made recipe {recipe.name}'
         logger.info(msg)
-    return all_food
+    return all_food, recipe_list
 
 def build_groups(food_items):
     """
@@ -424,7 +426,7 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
     logger.info('Combining food sheets')
     food_by_day = build_food_from_days(days)
     logger.info('Creating the food list')
-    all_food = create_shopping_list(food_by_day, master_df, recipes, already_have)
+    all_food, recipe_list = create_shopping_list(food_by_day, master_df, recipes, already_have)
     shopping_groups = build_groups(all_food)
     today = dt.date.today()
     with open(output_file, 'w+', encoding='utf-8') as s_file:
@@ -443,6 +445,12 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
             second_line += date_block
         s_file.write(first_line + '\n')
         s_file.write(second_line + '\n\n')
+        rec_header = 'Recipes Making this Week'
+        s_file.write(f'{rec_header}\n')
+        s_file.write(f"{'-'*len(rec_header)}\n")
+        for recipe in recipe_list:
+            s_file.write(f' - {recipe.name} - {elements.day_shortstr(recipe.days)}\n')
+        s_file.write('\n')
         for group_name, food_list in shopping_groups.items():
             s_file.write(group_name + '\n')
             s_file.write('-'*len(group_name) + '\n')
@@ -451,4 +459,4 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
             s_file.write('\n')
     msg = f'File Created {output_file}'
     logger.info(msg)
-    return all_food
+    return all_food, recipe_list

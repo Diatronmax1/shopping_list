@@ -5,6 +5,18 @@ with items that we want for the sheet.
 
 from pint import DimensionalityError
 
+def day_shortstr(days, fmt='%a'):
+    """
+    Retrieves a modified short string version of the
+    days this food is required.
+
+    Returns
+    =======
+    str
+    """
+    days = sorted(days)
+    return f"({','.join([day.strftime(fmt) for day in days])})"
+
 class Food():
     """
     An element of the list with a name and serving amt.
@@ -79,13 +91,9 @@ class Food():
         =======
         str
         """
-        days = sorted(self.days)
-        fmt = '%a'
         if self.food_type == 'Meat':
-            #Special case where displaying the date
-            #is more helpful.
-            fmt = '%m/%d'
-        return f"({','.join([day.strftime(fmt) for day in days])})"
+            return day_shortstr(self.days, '%m/%d')
+        return day_shortstr(self.days)
 
     def __str__(self):
         unit = self.amount
@@ -133,6 +141,7 @@ class Recipe():
     def __init__(self, name, rec_per_serv, ingredients=None):
         self.name = name
         self.rec_per_serv = rec_per_serv
+        self.days = set()
         self.ingredients = []
         if ingredients:
             self.ingredients = ingredients

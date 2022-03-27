@@ -307,8 +307,8 @@ class MainWidget(QMainWindow):
             self.shop_thread.started.connect(self.shopping_worker.run)
             self.shop_thread.start()
         else:
-            _shopping_list = shopping_list.main(sheet_data, out_file, self.string_io, ignored)
-            self.all_done(_shopping_list)
+            food_items, recipes = shopping_list.main(sheet_data, out_file, self.string_io, ignored)
+            self.all_done(food_items, recipes)
 
     def build_string_monitor(self):
         """
@@ -322,12 +322,12 @@ class MainWidget(QMainWindow):
         self.string_worker.string_changed.connect(self.update_status)
         self.mon_thread.start()
 
-    def all_done(self, results):
+    def all_done(self, food_items, recipes):
         """
         Close the string monitor and re-enable the list
         generator.
         """
-        self._shopping_list = results
+        self._shopping_list = food_items
         if self.string_worker:
             self.string_worker.alive = False
         self.mon_thread.quit()

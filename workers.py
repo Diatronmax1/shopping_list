@@ -58,7 +58,7 @@ class ShoppingWorker(QObject):
         A set of names that should be ignored.
     """
 
-    finished = pyqtSignal(dict)
+    finished = pyqtSignal(dict, list)
 
     def __init__(self, sheet_names, out_file, string_io, ignored):
         super().__init__()
@@ -71,6 +71,6 @@ class ShoppingWorker(QObject):
         """
         Builds the shopping list on a thread.
         """
-        results = shopping_list.main(
+        food_items, recipes = shopping_list.main(
             self.sheet_names, self.out_file, self.string_io, self.ignored)
-        self.finished.emit(results)
+        self.finished.emit(food_items, recipes)
