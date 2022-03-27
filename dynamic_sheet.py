@@ -3,12 +3,12 @@
 Provides a dynamic view of the shopping list with
 some tied in features.
 """
-from functools import partial
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QDialog,
     QHeaderView,
+    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QTableWidget,
@@ -54,6 +54,9 @@ class DynamicSheet(QDialog):
         #Add the groups to the scroll area and set as the main widget.
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(self.table_widget)
+        close_but = QPushButton('Close')
+        close_but.clicked.connect(self.accept)
+        main_layout.addWidget(close_but)
         self.resize(self.parent().size())
         #Set the table to stretch the first column.
         hoz_head = self.table_widget.horizontalHeader()
