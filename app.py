@@ -44,18 +44,16 @@ class OptionalDisplay(QDialog):
     will display this with a scrollable window.
     """
 
-    def __init__(self, text):
-        super().__init__(self)
+    def __init__(self, parent, text):
+        super().__init__(parent)
         if os.name != 'nt':
             msg.setWindowModality(Qt.WindowModal)
-        scroll_widget = QLabel(text)
-        self._scroll = QScrollArea()
+        text_widget = QTextEdit()
+        text_widget.setText(text)
         close_but = QPushButton('Close')
         close_but.clicked.connect(self.accept)
-        self._scroll.setWidgetResizable(True)
-        self._scroll.setWidget(scroll_widget)
         layout = QVBoxLayout(self)
-        layout.addWidget(self._scroll)
+        layout.addWidget(self.text_widget)
         layout.addWidget(close_but)
 
 class MainWidget(QMainWindow):
