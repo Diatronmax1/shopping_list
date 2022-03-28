@@ -68,7 +68,7 @@ class DynamicSheet(QDialog):
                 QSizePolicy.Minimum, QSizePolicy.MinimumExpanding)
         self.recipe_list.setContextMenuPolicy(Qt.ActionsContextMenu)
         self.recipe_list.addAction(ignore_recipe_act)
-        self.recipe_list.doubleClicked.connect(self.double_click_recipe)
+        self.recipe_list.itemDoubleClicked.connect(self.double_click_recipe)
         main_layout.addWidget(recipe_group)
         self.food_lists = {}
         for group_name, food_items in self.shopping_groups.items():
@@ -88,6 +88,7 @@ class DynamicSheet(QDialog):
             food_list.horizontalScrollBar().setStyleSheet("QScrollBar {height:0px;}")
             food_list.setSizePolicy(
                 QSizePolicy.Minimum, QSizePolicy.MinimumExpanding)
+            food_list.itemDoubleClicked.connect(self.double_click_food)
             main_layout.addWidget(food_group)
         self._scroll.setWidgetResizable(True)
         self._scroll.setWidget(main_widget)
@@ -98,7 +99,30 @@ class DynamicSheet(QDialog):
         main_layout.addWidget(close_but)
 
     def double_click_recipe(self, item):
-        QMessageBox.information(self, 'test', item.data(Qt.DisplayRole))
+        recipe = item.data(Qt.UserRole)
+        if recipe.name in self.parent()._recipes:
+            return
+        result = QMessageBox.information(
+            self,
+            item.data(Qt.DisplayRole),
+            'Add to Already Have?',
+            QMessageBox.Yes | QMessageBox.No)
+        if result == QMessageBox.Yes:
+            self.add_to_already_haves(item)
+            self.parent()._recipes.pop(recipe.name)
+
+    def double_click_food(self, item):
+        food = item.data(Qt.UserRole)
+        if food.name in self.parent()._shopping_list:
+            return
+        result = QMessageBox.information(
+            self,
+            item.data(Qt.DisplayRole),
+            'Add to Already Have?',
+            QMessageBox.Yes | QMessageBox.No)
+        if result == QMessageBox.Yes:
+            self.add_to_already_haves(item)
+            self.parent()._shopping_list.pop(food.name)
 
     def add_to_already_haves(self, item):
         """
