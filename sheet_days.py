@@ -5,7 +5,7 @@ sheet users.
 #pylint: disable=unspecified-encoding
 import os
 
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,

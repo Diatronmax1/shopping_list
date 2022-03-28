@@ -7,6 +7,7 @@ import os
 import subprocess
 from pathlib import Path
 
+from PyQt.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAction,
     QButtonGroup,
@@ -22,7 +23,6 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
-    QScrollArea,
     QTextEdit,
     QVBoxLayout,
     QWidget,
