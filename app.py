@@ -47,7 +47,7 @@ class OptionalDisplay(QDialog):
     def __init__(self, parent, text):
         super().__init__(parent)
         if os.name != 'nt':
-            msg.setWindowModality(Qt.WindowModal)
+            self.setWindowModality(Qt.WindowModal)
         text_widget = QTextEdit()
         text_widget.setText(text)
         close_but = QPushButton('Close')
