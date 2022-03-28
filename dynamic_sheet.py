@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QScrollArea,
@@ -67,6 +68,7 @@ class DynamicSheet(QDialog):
                 QSizePolicy.Minimum, QSizePolicy.MinimumExpanding)
         self.recipe_list.setContextMenuPolicy(Qt.ActionsContextMenu)
         self.recipe_list.addAction(ignore_recipe_act)
+        self.recipe_list.doubleClicked.connect(self.double_click_recipe)
         main_layout.addWidget(recipe_group)
         self.food_lists = {}
         for group_name, food_items in self.shopping_groups.items():
@@ -94,6 +96,9 @@ class DynamicSheet(QDialog):
         close_but = QPushButton('Close')
         close_but.clicked.connect(self.accept)
         main_layout.addWidget(close_but)
+
+    def double_click_recipe(self, item):
+        QMessageBox.information(self, 'test', item.data(Qt.DisplayRole))
 
     def add_to_already_haves(self, item):
         """
