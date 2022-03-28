@@ -53,7 +53,7 @@ class OptionalDisplay(QDialog):
         close_but = QPushButton('Close')
         close_but.clicked.connect(self.accept)
         layout = QVBoxLayout(self)
-        layout.addWidget(self.text_widget)
+        layout.addWidget(text_widget)
         layout.addWidget(close_but)
 
 class MainWidget(QMainWindow):
