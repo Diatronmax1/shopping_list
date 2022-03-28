@@ -64,7 +64,6 @@ class DynamicSheet(QDialog):
             recipe_item = QListWidgetItem()
             recipe_item.setData(Qt.DisplayRole, recipe.name)
             recipe_item.setData(Qt.UserRole, recipe)
-            recipe_item.setData(Qt.BackgroundRole, QBrush(QColor('white')))
             self.recipe_list.addItem(recipe_item)
         self.recipe_list.setContextMenuPolicy(Qt.ActionsContextMenu)
         self.recipe_list.addAction(ignore_recipe_act)
