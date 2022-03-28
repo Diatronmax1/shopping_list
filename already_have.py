@@ -2,15 +2,17 @@
 Breaks out the Already Have widgets for organization.
 """
 #pylint: disable=unspecified-encoding, invalid-name
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QCheckBox,
+    QAction,
     QDialog,
-    QInputDialog,
     QGridLayout,
-    QMenu,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
     QPushButton,
-    QWidget,
 )
 import yaml
 
@@ -53,80 +55,63 @@ def get_ignored():
     """
     return set([name.lower() for name, use in get_names().items() if use])
 
-class HaveCheck(QCheckBox):
-    """
-    Subclassing the Checkbox to catch
-    the right click events.
-
-    """
-
-    new_name = pyqtSignal(QCheckBox, str)
-    remove_name = pyqtSignal(QCheckBox)
-
-    def contextMenuEvent(self, event):
-        """
-        Handles the right click scenario for check boxes
-
-        Parameters
-        ==========
-        event : QtGui.QContextMenuEvent
-            The event.
-        """
-        con_menu = QMenu(self)
-        new_name_act = con_menu.addAction("Change Name")
-        remove_act = con_menu.addAction("Delete")
-        action = con_menu.exec_(self.mapToGlobal(event.pos()))
-        if action == new_name_act:
-            text, ok_pressed = QInputDialog.getText(self,
-                'Enter new name',
-                'Name: ',)
-            if text and ok_pressed:
-                self.new_name.emit(self, text)
-        elif action == remove_act:
-            self.remove_name.emit(self)
-
 class AlreadyHave(QDialog):
     """
     Widget that allows manipulation of the underlying
     ini file and can set and remove different names
     to be ignored.
-    """
 
-    MAX_ROWS = 10
+    """
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle('Check boxes to modify values')
-        self.names = get_names()
+        self.setWindowTitle('Already Haves')
         self.save_and_close = QPushButton('Save and Close')
+        modify_act = QAction('Change Name?', self)
+        remove_act = QAction('Remove?', self)
         self.cancel_but = QPushButton('Cancel')
-        self.create_new = QPushButton('New')
-        self.create_new.clicked.connect(self.new_element)
+        self.create_new = QPushButton('+')
+        self.already_haves = QListWidget()
+        self.already_haves.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.already_haves.addActions([modify_act, remove_act])
+        for name, used in get_names().items():
+            new_item = QListWidgetItem()
+            new_item.setData(Qt.DisplayRole, name)
+            if used:
+                new_item.setData(Qt.CheckStateRole, Qt.Checked)
+            else:
+                new_item.setData(Qt.CheckStateRole, Qt.Unchecked)
+            self.already_haves.addItem(new_item)
+        #Signals.
+        modify_act.triggered.connect(self.modify_name)
+        remove_act.triggered.connect(self.remove_name)
+        self.create_new.clicked.connect(self.new_item)
         self.save_and_close.clicked.connect(self.accept)
         self.cancel_but.clicked.connect(self.reject)
         #Checkboxes.
-        self.checks = QWidget()
-        self.check_layout = QGridLayout(self.checks)
-        for food, used in self.names.items():
-            self.new_check(food, used)
-        #Main Layout
-        self.main_layout = QGridLayout(self)
-        self.resize(400,400)
-        self.refresh_layout()
+        layout = QGridLayout(self)
+        msg = 'Add new items to be ignored (case-insensitive)\n'
+        msg += 'Check or uncheck items to enable them as ignored\n'
+        msg += 'Right click and delete or double click and answer prompt\n'
+        layout.addWidget(QLabel(msg),         0, 0, 1, 2)
+        layout.addWidget(self.create_new,     1, 1)
+        layout.addWidget(self.already_haves,  2, 0, 1, 2)
+        layout.addWidget(self.save_and_close, 3, 0)
+        layout.addWidget(self.cancel_but,     3, 1)
 
-    def refresh_layout(self):
+    def check_name(self, name):
         """
-        Clears the main layout and rebuilds it.
+        Verifies name is not already in list of
+        items.
         """
-        for _ in range(self.main_layout.count()):
-            layout_item = self.main_layout.takeAt(0)
-            layout_item.widget().setParent(None)
-        self.main_layout.addWidget(self.create_new,     0, 1)
-        self.main_layout.addWidget(self.checks,         1, 0, 2, 1)
-        self.main_layout.addWidget(self.cancel_but,     2, 0)
-        self.main_layout.addWidget(self.save_and_close, 2, 1)
+        for row in range(self.already_haves.count()):
+            item = self.already_haves.item(row)
+            if name.lower() == item.data(Qt.DisplayRole).lower():
+                QMessageBox.information(self, 'Names', f'{name} already in list!')
+                return True
+        return False
 
-    def new_check(self, name, val):
+    def new_item(self):
         """
         Convenience method to add a new check box.
 
@@ -137,34 +122,18 @@ class AlreadyHave(QDialog):
         val : bool
             Representing the state of the checkbox.
         """
-        name_check = HaveCheck(name)
-        name_check.setChecked(val)
-        func = lambda:self.name_change(name, name_check.isChecked())
-        name_check.clicked.connect(func)
-        name_check.new_name.connect(self.modify_name)
-        name_check.remove_name.connect(self.remove_name)
-        #Compute what row and col this should be added to based on
-        #the number of items in the layout.
-        num_items = self.check_layout.count()
-        row = num_items % self.MAX_ROWS
-        col = num_items // self.MAX_ROWS
-        self.check_layout.addWidget(name_check, row, col)
+        name, ok_pressed = QInputDialog.getText(self,
+            'New Item',
+            'Name: ')
+        if name and ok_pressed:
+            if self.check_name(name):
+                return
+            new_item = QListWidgetItem()
+            new_item.setData(Qt.DisplayRole, name)
+            new_item.setData(Qt.CheckStateRole, Qt.Checked)
+            self.already_haves.addItem(new_item)
 
-    def new_element(self):
-        """
-        Creates a widget to request the new name
-        and modifies the layout to include the new checkbox.
-        """
-        text, ok_pressed = QInputDialog.getText(
-            self,
-            'Provide a name',
-            'Name:')
-        if text and ok_pressed:
-            self.new_check(text, True)
-            self.name_change(text, True)
-        self.refresh_layout()
-
-    def modify_name(self, widget, new_name):
+    def modify_name(self):
         """
         Updates the name in the dictionary to the new
         one preserving the state.
@@ -176,27 +145,16 @@ class AlreadyHave(QDialog):
         new_name : str
             The new name for the dictionary.
         """
-        self.names.pop(widget.text())
-        self.take_check(widget)
-        self.new_check(new_name, widget.isChecked())
-        self.name_change(new_name, widget.isChecked())
-        self.refresh_layout()
+        item = self.already_haves.currentItem()
+        new_name, ok_pressed = QInputDialog.getText(self,
+            f'New name for {item.data(Qt.DisplayRole)}',
+            'New Name: ')
+        if new_name and ok_pressed:
+            if self.check_name(new_name):
+                return
+            item.setData(Qt.DisplayRole, new_name)
 
-    def take_check(self, widget):
-        """
-        Convenience method to handle removing a widget
-        from a layout consistently.
-
-        Parameters
-        ----------
-        widget : QWidget
-            The widget to remove from the check layout.
-        """
-        idx = self.check_layout.indexOf(widget)
-        self.check_layout.takeAt(idx)
-        widget.setParent(None)
-
-    def remove_name(self, widget):
+    def remove_name(self):
         """
         Removes a name from config.
 
@@ -205,26 +163,19 @@ class AlreadyHave(QDialog):
         widget : HaveCheck
             The widget to delete.
         """
-        self.names.pop(widget.text())
-        self.take_check(widget)
-        self.refresh_layout()
-
-    def name_change(self, name, is_checked):
-        """
-        Modifies name in the internal config.
-
-        Parameters
-        ----------
-        name : str
-            Name of the value to update.
-        is_checked : bool
-            The state for the name.
-        """
-        self.names[name.lower()] = is_checked
+        row = self.already_haves.currentRow()
+        item = self.already_haves.takeItem(row)
+        del item
 
     def accept(self):
         """
         Saves the cfg to the file.
         """
-        write_names(self.names)
+        names = {}
+        for row in range(self.already_haves.count()):
+            item = self.already_haves.item(row)
+            name = item.data(Qt.DisplayRole)
+            checked = item.data(Qt.CheckStateRole) == Qt.Checked
+            names[name] = checked
+        write_names(names)
         super().accept()

@@ -3,6 +3,7 @@ Main application window to create shopping lists from.
 """
 #pylint: disable=unspecified-encoding, invalid-name
 from functools import partial
+from optparse import Option
 import os
 import subprocess
 from pathlib import Path
@@ -11,6 +12,7 @@ from PyQt5.QtWidgets import (
     QAction,
     QButtonGroup,
     QCheckBox,
+    QDialog,
     QGroupBox,
     QFormLayout,
     QHBoxLayout,
@@ -21,6 +23,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QScrollArea,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -35,6 +38,24 @@ from dynamic_sheet import DynamicSheet
 import sheet_days
 from core import DAYS, CFG_PATH, check_keyfile, change_keyfile
 from workers import StringMonitor, ShoppingWorker
+
+class OptionalDisplay(QDialog):
+    """
+    If it fails to open with a text editor
+    will display this with a scrollable window.
+    """
+
+    def __init__(self, text):
+        super().__init__(self)
+        scroll_widget = QLabel(text)
+        self._scroll = QScrollArea()
+        close_but = QPushButton('Close')
+        close_but.clicked.connect(self.accept)
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setWidget(scroll_widget)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self._scroll)
+        layout.addWidget(close_but)
 
 class MainWidget(QMainWindow):
     """
@@ -159,10 +180,16 @@ class MainWidget(QMainWindow):
         if not shop_file.exists():
             QMessageBox.information(self, 'Open File', f'{shop_file} does not exist!')
             return
-        if os.name == 'nt':
-            os.startfile(shop_file)
-        else:
-            subprocess.Popen(['open', '-W', shop_file])
+        try:
+            if os.name == 'nt':
+                os.startfile(shop_file)
+            else:
+                subprocess.Popen(['open', '-W', shop_file])
+        except:
+            with open(shop_file, 'r') as s_file:
+                shop_text = s_file.read()
+            dialog = OptionalDisplay(self, shop_text)
+            dialog.open()
 
     def open_dynamic_sheet(self):
         """

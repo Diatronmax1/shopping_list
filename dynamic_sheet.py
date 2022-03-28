@@ -91,6 +91,7 @@ class DynamicSheet(QDialog):
             food_list.setSizePolicy(list_policy)
             food_list.itemDoubleClicked.connect(self.double_click_food)
             main_layout.addWidget(food_group)
+        main_widget.setSizePolicy(list_policy)
         self._scroll.setWidgetResizable(True)
         self._scroll.setWidget(main_widget)
         main_layout = QVBoxLayout(self)
@@ -101,7 +102,7 @@ class DynamicSheet(QDialog):
 
     def double_click_recipe(self, item):
         recipe = item.data(Qt.UserRole)
-        if recipe.name in self.parent()._recipes:
+        if recipe.name not in self.parent()._recipes:
             return
         result = QMessageBox.information(
             self,
@@ -114,7 +115,7 @@ class DynamicSheet(QDialog):
 
     def double_click_food(self, item):
         food = item.data(Qt.UserRole)
-        if food.name in self.parent()._shopping_list:
+        if food.name not in self.parent()._shopping_list:
             return
         result = QMessageBox.information(
             self,
