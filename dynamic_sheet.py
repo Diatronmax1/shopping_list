@@ -80,7 +80,6 @@ class DynamicSheet(QDialog):
                 new_item = QListWidgetItem()
                 new_item.setData(Qt.DisplayRole, food_item.name)
                 new_item.setData(Qt.UserRole, food_item)
-                new_item.setData(Qt.BackgroundRole, QBrush(QColor('white')))
                 food_list.addItem(new_item)
             food_list.setContextMenuPolicy(Qt.ActionsContextMenu)
             food_list.pressed.connect(partial(self.set_current_group, group_name))
@@ -109,7 +108,7 @@ class DynamicSheet(QDialog):
         names = get_names()
         names[food.name.lower()] = True
         write_names(names)
-        item.setData(Qt.BackgroundRole, QBrush(QColor('grey')))
+        item.setData(Qt.CheckStateRole, Qt.Checked)
 
     def ignore_recipe(self):
         """
