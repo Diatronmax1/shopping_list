@@ -7,7 +7,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from PyQt.QtCore import Qt
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAction,
     QButtonGroup,
