@@ -11,6 +11,8 @@ from PyQt5.QtWidgets import (
     QAction,
     QDialog,
     QGroupBox,
+    QHBoxLayout,
+    QLabel,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -57,33 +59,37 @@ class DynamicSheet(QDialog):
         ignore_food_act = QAction('Add to Already Have', self)
         ignore_food_act.triggered.connect(self.ignore_food)
         #Build the recipe group.
-        main_widget = QWidget()
-        main_layout = QVBoxLayout(main_widget)
+        list_widget = QWidget()
+        list_layout = QVBoxLayout(list_widget)
         recipe_group = QGroupBox('Recipes')
         layout = QVBoxLayout(recipe_group)
         layout.addWidget(self.recipe_list)
         list_policy = QSizePolicy(
-            QSizePolicy.MinimumExpanding,
+            QSizePolicy.Preferred,
             QSizePolicy.MinimumExpanding)
         for recipe in self.recipes.values():
             recipe_item = QListWidgetItem()
             recipe_item.setData(Qt.DisplayRole, recipe.name)
             recipe_item.setData(Qt.UserRole, recipe)
             self.recipe_list.addItem(recipe_item)
-            self.recipe_list.horizontalScrollBar().setStyleSheet("QScrollBar {height:0px;}")
+            self.recipe_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             self.recipe_list.setSizePolicy(list_policy)
         self.recipe_list.setContextMenuPolicy(Qt.ActionsContextMenu)
         self.recipe_list.addAction(ignore_recipe_act)
         self.recipe_list.itemDoubleClicked.connect(self.double_click_recipe)
-        main_layout.addWidget(recipe_group)
+        list_layout.addWidget(recipe_group)
         self.food_lists = {}
-        for group_name, food_items in self.shopping_groups.items():
+        group_names = sorted(self.shopping_groups)
+        if 'No Category' in group_names:
+            group_names.remove('No Category')
+            group_names.append('No Category')
+        for group_name in group_names:
             food_group = QGroupBox(group_name)
             layout = QVBoxLayout(food_group)
             food_list = QListWidget()
             layout.addWidget(food_list)
             self.food_lists[group_name] = food_list
-            for food_item in food_items:
+            for food_item in self.shopping_groups[group_name]:
                 new_item = QListWidgetItem()
                 new_item.setData(Qt.DisplayRole, food_item.name)
                 new_item.setData(Qt.UserRole, food_item)
@@ -91,19 +97,23 @@ class DynamicSheet(QDialog):
             food_list.setContextMenuPolicy(Qt.ActionsContextMenu)
             food_list.pressed.connect(partial(self.set_current_group, group_name))
             food_list.addAction(ignore_food_act)
-            food_list.horizontalScrollBar().setStyleSheet("QScrollBar {height:0px;}")
+            food_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             food_list.setSizePolicy(list_policy)
             food_list.itemDoubleClicked.connect(self.double_click_food)
-            main_layout.addWidget(food_group)
-        main_widget.setSizePolicy(list_policy)
+            list_layout.addWidget(food_group)
+        main_widget = QWidget()
+        main_layout = QHBoxLayout(main_widget)
+        main_layout.addWidget(list_widget)
+        main_layout.addSpacing(10)
         self._scroll.setWidgetResizable(True)
         self._scroll.setWidget(main_widget)
+        self._scroll.setSizePolicy(list_policy)
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(self._scroll)
         close_but = QPushButton('Close')
         close_but.clicked.connect(self.accept)
         main_layout.addWidget(close_but)
-        self.resize(parent.size())
+        #self.resize(parent.size())
 
     def double_click_recipe(self, item):
         recipe = item.data(Qt.UserRole)

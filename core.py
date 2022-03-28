@@ -24,6 +24,7 @@ DEFAULTS = {
     'threaded':True,
     'filename':'shopping_list',
     'output_dir': '~/Desktop',
+    'mobile':False,
 }
 
 def build_days():
@@ -42,6 +43,23 @@ def create_default_config():
     """
     with open(CFG_PATH, 'w') as y_file:
         yaml.dump(DEFAULTS, y_file)
+
+def change_bool(name, action):
+    """
+    Modfies a boolean in the config.
+
+    Parameters
+    ----------
+    name : str
+        Name of the boolean value
+    QAction
+        The action that triggered the state.
+    """
+    with open(CFG_PATH, 'rb') as y_file:
+        yaml_dict = yaml.load(y_file, yaml.Loader)
+        yaml_dict[name] = action.isChecked()
+    with open(CFG_PATH, 'w') as y_file:
+        yaml_dict = yaml.dump(yaml_dict, y_file, yaml.Dumper)
 
 def check_config():
     """Verifies the config is ok to use."""

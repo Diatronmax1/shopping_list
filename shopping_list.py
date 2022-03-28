@@ -448,10 +448,14 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
         for recipe in used_recipes.values():
             s_file.write(f' - {recipe.name} - {elements.day_shortstr(recipe.days)}\n')
         s_file.write('\n')
-        for group_name, food_list in shopping_groups.items():
+        group_names = sorted(shopping_groups)
+        if 'No Category' in group_names:
+            group_names.remove('No Category')
+            group_names.append('No Category')
+        for group_name in group_names:
             s_file.write(group_name + '\n')
             s_file.write('-'*len(group_name) + '\n')
-            for food_item in food_list:
+            for food_item in shopping_groups[group_name]:
                 s_file.write(f'{food_item}\n')
             s_file.write('\n')
     msg = f'File Created {output_file}'

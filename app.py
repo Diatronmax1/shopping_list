@@ -35,6 +35,7 @@ import shopping_list
 import already_have
 from dynamic_sheet import DynamicSheet
 import sheet_days
+import core
 from core import DAYS, CFG_PATH, check_keyfile, change_keyfile
 from workers import StringMonitor, ShoppingWorker
 
@@ -75,13 +76,12 @@ class MainWidget(QMainWindow):
         self.setWindowTitle('Shopping List Creator')
         with open(CFG_PATH, 'rb') as y_file:
             cfg_dict = yaml.load(y_file, yaml.Loader)
-        self._threaded = cfg_dict['threaded']
         self.already_haves = None
         self.dynamic_sheet = None
         self._shopping_list = {}
         self._recipes = {}
         self.string_io = string_io
-        self.make_menu()
+        self.make_menu(cfg_dict)
         #Create button group for days.
         self.day_buttons = QButtonGroup()
         self.day_buttons.setExclusive(False)
@@ -110,7 +110,10 @@ class MainWidget(QMainWindow):
         apply_all_but.clicked.connect(self.update_all_sheet_data)
         #Layout
         day_group = QGroupBox('Days')
-        layout = QVBoxLayout(day_group)
+        if cfg_dict['mobile']:
+            layout = QVBoxLayout(day_group)
+        else:
+            layout = QHBoxLayout(day_group)
         for button in self.day_buttons.buttons():
             button.setChecked(True)
             layout.addWidget(button)
@@ -146,9 +149,14 @@ class MainWidget(QMainWindow):
         #Set main.
         self.setCentralWidget(central_widget)
 
-    def make_menu(self):
+    def make_menu(self, cfg_dict):
         """
         Creates menus.
+
+        Parameters
+        ----------
+        cfg_dict : dict
+            The configuration settings.
         """
         #File Menu
         open_sheet_act = QAction('Open Shopping List', self)
@@ -163,14 +171,19 @@ class MainWidget(QMainWindow):
         #Developer Options
         threaded_act = QAction('Threaded', self)
         threaded_act.setCheckable(True)
-        threaded_act.setChecked(self._threaded)
+        threaded_act.setChecked(cfg_dict['threaded'])
+        mobile_act = QAction('Mobile', self)
+        mobile_act.setCheckable(True)
+        mobile_act.setChecked(cfg_dict['mobile'])
         dev_menu = self.menuBar().addMenu('Developer Options')
         dev_menu.addAction(threaded_act)
+        dev_menu.addAction(mobile_act)
         #Tie signals.
         open_sheet_act.triggered.connect(self.open_shopping_list)
         open_dynamic_sheet_act.triggered.connect(self.open_dynamic_sheet)
         already_have_act.triggered.connect(self.edit_already_haves)
-        threaded_act.toggled.connect(self.change_threaded_state)
+        threaded_act.toggled.connect(partial(core.change_bool, 'threaded', threaded_act))
+        mobile_act.toggled.connect(partial(core.change_bool, 'mobile', mobile_act))
 
     def open_shopping_list(self):
         """
@@ -185,7 +198,8 @@ class MainWidget(QMainWindow):
                 os.startfile(shop_file)
             else:
                 subprocess.Popen(['open', '-W', shop_file])
-        except:
+        except Exception as exc:
+            print(exc)
             with open(shop_file, 'r') as s_file:
                 shop_text = s_file.read()
             dialog = OptionalDisplay(self, shop_text)
@@ -212,17 +226,6 @@ class MainWidget(QMainWindow):
             self._shopping_list,
             self._recipes)
         self.dynamic_sheet.open()
-
-    def change_threaded_state(self, state):
-        """
-        Modifies the threaded state.
-        """
-        self._threaded = state
-        with open(CFG_PATH, 'rb') as y_file:
-            yaml_dict = yaml.load(y_file, yaml.Loader)
-            yaml_dict['threaded'] = self._threaded
-        with open(CFG_PATH, 'w') as y_file:
-            yaml_dict = yaml.dump(yaml_dict, y_file, yaml.Dumper)
 
     def edit_sheet_data(self, button, sheet_name):
         """
@@ -335,6 +338,8 @@ class MainWidget(QMainWindow):
             If provided, will be called at the end of making
             the shopping list.
         """
+        with open(CFG_PATH, 'rb') as y_file:
+            cfg_dict = yaml.load(y_file, yaml.Loader)
         ignored = already_have.get_ignored()
         self.build_string_monitor()
         self.generate_list_but.setEnabled(False)
@@ -344,7 +349,7 @@ class MainWidget(QMainWindow):
             return
         self.shop_thread = QThread()
         sheet_data = sheet_days.get_sheet_data(True)
-        if self._threaded:
+        if cfg_dict['threaded']:
             self.shopping_worker = ShoppingWorker(
                 sheet_data, out_file, self.string_io, ignored, fn_callback)
             self.shopping_worker.moveToThread(self.shop_thread)
