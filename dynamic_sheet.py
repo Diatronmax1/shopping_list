@@ -91,7 +91,6 @@ class DynamicSheet(QDialog):
         close_but = QPushButton('Close')
         close_but.clicked.connect(self.accept)
         main_layout.addWidget(close_but)
-        self.resize(self.parent().size())
 
     def add_to_already_haves(self, item):
         """
