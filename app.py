@@ -89,7 +89,7 @@ class MainWidget(QMainWindow):
         apply_all_but.clicked.connect(self.update_all_sheet_data)
         #Layout
         day_group = QGroupBox('Days')
-        layout = QHBoxLayout(day_group)
+        layout = QVBoxLayout(day_group)
         for button in self.day_buttons.buttons():
             button.setChecked(True)
             layout.addWidget(button)
