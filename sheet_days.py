@@ -3,6 +3,8 @@ Provides widgets for editing days for individual
 sheet users.
 """
 #pylint: disable=unspecified-encoding
+import os
+
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import (
     QCheckBox,
@@ -106,6 +108,8 @@ class SheetDay(QDialog):
     def __init__(self, parent, sheet_name):
         super().__init__(parent)
         self.setWindowTitle(f'Editing {sheet_name}')
+        if os.name != 'nt':
+            msg.setWindowModality(Qt.WindowModal)
         self.sheet_name = sheet_name
         self.sheets = get_sheet_data()
         self.current_sheet = self.sheets[self.sheet_name]

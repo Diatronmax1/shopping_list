@@ -3,6 +3,8 @@
 Provides a dynamic view of the shopping list with
 some tied in features.
 """
+import os
+
 from functools import partial
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -42,6 +44,8 @@ class DynamicSheet(QDialog):
     def __init__(self, parent, food_items, recipes):
         super().__init__(parent)
         self.setWindowTitle('Dynamic Sheet')
+        if os.name != 'nt':
+            msg.setWindowModality(Qt.WindowModal)
         self._scroll = QScrollArea()
         self.food_items = food_items
         self.recipes = recipes

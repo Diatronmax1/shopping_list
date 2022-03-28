@@ -3,7 +3,6 @@ Main application window to create shopping lists from.
 """
 #pylint: disable=unspecified-encoding, invalid-name
 from functools import partial
-from optparse import Option
 import os
 import subprocess
 from pathlib import Path
@@ -47,6 +46,8 @@ class OptionalDisplay(QDialog):
 
     def __init__(self, text):
         super().__init__(self)
+        if os.name != 'nt':
+            msg.setWindowModality(Qt.WindowModal)
         scroll_widget = QLabel(text)
         self._scroll = QScrollArea()
         close_but = QPushButton('Close')

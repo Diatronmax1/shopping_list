@@ -2,6 +2,8 @@
 Breaks out the Already Have widgets for organization.
 """
 #pylint: disable=unspecified-encoding, invalid-name
+import os
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAction,
@@ -65,6 +67,8 @@ class AlreadyHave(QDialog):
 
     def __init__(self, parent):
         super().__init__(parent)
+        if os.name != 'nt':
+            self.setWindowModality(Qt.WindowModal)
         self.setWindowTitle('Already Haves')
         self.save_and_close = QPushButton('Save and Close')
         modify_act = QAction('Change Name?', self)
@@ -74,6 +78,7 @@ class AlreadyHave(QDialog):
         self.already_haves = QListWidget()
         self.already_haves.setContextMenuPolicy(Qt.ActionsContextMenu)
         self.already_haves.addActions([modify_act, remove_act])
+        self.already_haves.itemDoubleClicked.connect(self.prompt_actions)
         for name, used in get_names().items():
             new_item = QListWidgetItem()
             new_item.setData(Qt.DisplayRole, name)
@@ -98,6 +103,25 @@ class AlreadyHave(QDialog):
         layout.addWidget(self.already_haves,  2, 0, 1, 2)
         layout.addWidget(self.save_and_close, 3, 0)
         layout.addWidget(self.cancel_but,     3, 1)
+
+    def prompt_actions(self):
+        """
+        For mobile.
+        """
+        msg = QMessageBox(self)
+        if os.name != 'nt':
+            msg.setWindowModality(Qt.WindowModality)
+        msg.setText('Modify Item')
+        msg.setInformativeText('Name can change or item can be removed.')
+        mod_but = msg.addButton('Modify Name', QMessageBox.AcceptRole)
+        rem_but = msg.addButton('Remove', QMessageBox.DestructiveRole)
+        msg.addButton('Cancel', QMessageBox.RejectRole)
+        msg.exec()
+        button = msg.clickedButton()
+        if button == mod_but:
+            self.modify_name()
+        elif button == rem_but:
+            self.remove_name()
 
     def check_name(self, name):
         """
