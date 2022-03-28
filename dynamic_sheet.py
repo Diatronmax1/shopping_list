@@ -89,8 +89,6 @@ class DynamicSheet(QDialog):
         close_but = QPushButton('Close')
         close_but.clicked.connect(self.accept)
         main_layout.addWidget(close_but)
-        new_width = int(self.size().width() * 1.2)
-        self.resize(QSize(new_width, self.size().height()))
 
     def add_to_already_haves(self, item):
         """
@@ -114,20 +112,22 @@ class DynamicSheet(QDialog):
         it from parent recipes and adds it to already haves.
         """
         item = self.recipe_list.currentItem()
-        if item.data(Qt.DisplayRole) not in self.parent()._recipes:
+        recipe = item.data(Qt.UserRole)
+        if recipe.name not in self.parent()._recipes:
             return
         self.add_to_already_haves(item)
-        self.parent()._recipes.pop(item.data(Qt.DisplayRole))
+        self.parent()._recipes.pop(recipe.name)
 
     def ignore_food(self):
         """
         Should try to ignore this food for the user.
         """
         item = self.food_lists[self.cur_group].currentItem()
-        if item.data(Qt.DisplayRole) not in self.parent()._shopping_list:
+        food = item.data(Qt.UserRole)
+        if food.name not in self.parent()._shopping_list:
             return
         self.add_to_already_haves(item)
-        self.parent()._shopping_list.pop(item.data(Qt.DisplayRole))
+        self.parent()._shopping_list.pop(food.name)
 
     def set_current_group(self, group_name):
         """When context menu requested, sets the current group its from."""
