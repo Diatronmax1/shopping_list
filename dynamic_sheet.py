@@ -103,6 +103,7 @@ class DynamicSheet(QDialog):
         close_but = QPushButton('Close')
         close_but.clicked.connect(self.accept)
         main_layout.addWidget(close_but)
+        self.resize(parent.size())
 
     def double_click_recipe(self, item):
         recipe = item.data(Qt.UserRole)

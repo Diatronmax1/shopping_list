@@ -55,6 +55,7 @@ class OptionalDisplay(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(text_widget)
         layout.addWidget(close_but)
+        self.resize(parent.size())
 
 class MainWidget(QMainWindow):
     """
