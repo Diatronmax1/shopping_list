@@ -12,7 +12,6 @@ from PyQt5.QtWidgets import (
     QDialog,
     QGroupBox,
     QHBoxLayout,
-    QLabel,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -23,6 +22,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+import core
 from already_have import write_names, get_names
 from shopping_list import build_groups
 
@@ -113,7 +113,8 @@ class DynamicSheet(QDialog):
         close_but = QPushButton('Close')
         close_but.clicked.connect(self.accept)
         main_layout.addWidget(close_but)
-        #self.resize(parent.size())
+        if core.get_bool('mobile'):
+            self.resize(parent.size())
 
     def double_click_recipe(self, item):
         recipe = item.data(Qt.UserRole)

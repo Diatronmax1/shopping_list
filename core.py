@@ -61,6 +61,18 @@ def change_bool(name, action):
     with open(CFG_PATH, 'w') as y_file:
         yaml_dict = yaml.dump(yaml_dict, y_file, yaml.Dumper)
 
+def get_bool(name):
+    """
+    Retrieves a boolean value in the config by name.
+
+    Parameters
+    ----------
+    name : str
+        Name of the bool.
+    """
+    with open(CFG_PATH, 'rb') as y_file:
+        return yaml.load(y_file, yaml.Loader)[name]
+
 def check_config():
     """Verifies the config is ok to use."""
     if CFG_PATH.exists():
