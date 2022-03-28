@@ -110,7 +110,7 @@ class AlreadyHave(QDialog):
         """
         msg = QMessageBox(self)
         if os.name != 'nt':
-            msg.setWindowModality(Qt.WindowModality)
+            msg.setWindowModality(Qt.WindowModal)
         msg.setText('Modify Item')
         msg.setInformativeText('Name can change or item can be removed.')
         mod_but = msg.addButton('Modify Name', QMessageBox.AcceptRole)
