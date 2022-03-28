@@ -58,14 +58,16 @@ class DynamicSheet(QDialog):
         recipe_group = QGroupBox('Recipes')
         layout = QVBoxLayout(recipe_group)
         layout.addWidget(self.recipe_list)
+        list_policy = QSizePolicy(
+            QSizePolicy.MinimumExpanding,
+            QSizePolicy.MinimumExpanding)
         for recipe in self.recipes.values():
             recipe_item = QListWidgetItem()
             recipe_item.setData(Qt.DisplayRole, recipe.name)
             recipe_item.setData(Qt.UserRole, recipe)
             self.recipe_list.addItem(recipe_item)
             self.recipe_list.horizontalScrollBar().setStyleSheet("QScrollBar {height:0px;}")
-            self.recipe_list.setSizePolicy(
-                QSizePolicy.Minimum, QSizePolicy.MinimumExpanding)
+            self.recipe_list.setSizePolicy(list_policy)
         self.recipe_list.setContextMenuPolicy(Qt.ActionsContextMenu)
         self.recipe_list.addAction(ignore_recipe_act)
         self.recipe_list.itemDoubleClicked.connect(self.double_click_recipe)
@@ -86,8 +88,7 @@ class DynamicSheet(QDialog):
             food_list.pressed.connect(partial(self.set_current_group, group_name))
             food_list.addAction(ignore_food_act)
             food_list.horizontalScrollBar().setStyleSheet("QScrollBar {height:0px;}")
-            food_list.setSizePolicy(
-                QSizePolicy.Minimum, QSizePolicy.MinimumExpanding)
+            food_list.setSizePolicy(list_policy)
             food_list.itemDoubleClicked.connect(self.double_click_food)
             main_layout.addWidget(food_group)
         self._scroll.setWidgetResizable(True)
