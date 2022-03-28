@@ -4,7 +4,7 @@ Provides a dynamic view of the shopping list with
 some tied in features.
 """
 from functools import partial
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAction,
     QDialog,
@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QSizePolicy,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -62,6 +63,8 @@ class DynamicSheet(QDialog):
             recipe_item.setData(Qt.UserRole, recipe)
             self.recipe_list.addItem(recipe_item)
             self.recipe_list.horizontalScrollBar().setStyleSheet("QScrollBar {height:0px;}")
+            self.recipe_list.setSizePolicy(
+                QSizePolicy.Minimum, QSizePolicy.MinimumExpanding)
         self.recipe_list.setContextMenuPolicy(Qt.ActionsContextMenu)
         self.recipe_list.addAction(ignore_recipe_act)
         main_layout.addWidget(recipe_group)
@@ -81,6 +84,8 @@ class DynamicSheet(QDialog):
             food_list.pressed.connect(partial(self.set_current_group, group_name))
             food_list.addAction(ignore_food_act)
             food_list.horizontalScrollBar().setStyleSheet("QScrollBar {height:0px;}")
+            food_list.setSizePolicy(
+                QSizePolicy.Minimum, QSizePolicy.MinimumExpanding)
             main_layout.addWidget(food_group)
         self._scroll.setWidgetResizable(True)
         self._scroll.setWidget(main_widget)
