@@ -58,6 +58,7 @@ class MainWidget(QMainWindow):
         self.already_haves = None
         self.dynamic_sheet = None
         self._shopping_list = {}
+        self._recipes = {}
         self.string_io = string_io
         self.make_menu()
         #Create button group for days.
@@ -173,7 +174,10 @@ class MainWidget(QMainWindow):
                 'Dynamic Sheet',
                 'Must have an active sheet back from generate list',)
             return
-        self.dynamic_sheet = DynamicSheet(self, self._shopping_list)
+        self.dynamic_sheet = DynamicSheet(
+            self,
+            self._shopping_list,
+            self._recipes)
         self.dynamic_sheet.open()
 
     def change_threaded_state(self, state):
@@ -330,6 +334,7 @@ class MainWidget(QMainWindow):
         generator.
         """
         self._shopping_list = food_items
+        self._recipes = recipes
         if self.string_worker:
             self.string_worker.alive = False
         self.mon_thread.quit()

@@ -252,7 +252,7 @@ def add_food(new_food, all_food, already_have, ignored):
             ignored[new_food.name] += new_food.amount
         else:
             ignored[new_food.name] = new_food.amount
-            return
+        return
     if new_food.name in all_food:
         all_food[new_food.name] += new_food
     else:
@@ -285,17 +285,17 @@ def create_shopping_list(items, master_df, recipes, already_have):
     food_names = list(items.keys())
     ignored = {}
     ignored_recipes = []
-    recipe_list = []
+    used_recipes = {}
     for name in food_names:
         #Dont look for it later in master
         if name in recipes:
             recipe = recipes[name]
             chosen_item = items.pop(name)
             recipe.days |= chosen_item.days
-            recipe_list.append(recipe)
             if recipe.name.lower() in already_have:
                 ignored_recipes.append(recipe)
                 continue
+            used_recipes[recipe.name] = recipe
             item_servings = chosen_item.total_servings()
             num_recipes = item_servings * recipe.rec_per_serv
             #If there are more servings requested then the
@@ -344,7 +344,7 @@ def create_shopping_list(items, master_df, recipes, already_have):
     for recipe in ignored_recipes:
         msg = f'Assuming already made recipe {recipe.name}'
         logger.info(msg)
-    return all_food, recipe_list
+    return all_food, used_recipes
 
 def build_groups(food_items):
     """
@@ -423,7 +423,7 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
     logger.info('Combining food sheets')
     food_by_day = build_food_from_days(days)
     logger.info('Creating the food list')
-    all_food, recipe_list = create_shopping_list(food_by_day, master_df, recipes, already_have)
+    all_food, used_recipes = create_shopping_list(food_by_day, master_df, recipes, already_have)
     shopping_groups = build_groups(all_food)
     today = dt.date.today()
     with open(output_file, 'w+', encoding='utf-8') as s_file:
@@ -445,7 +445,7 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
         rec_header = 'Recipes Making this Week'
         s_file.write(f'{rec_header}\n')
         s_file.write(f"{'-'*len(rec_header)}\n")
-        for recipe in recipe_list:
+        for recipe in used_recipes.values():
             s_file.write(f' - {recipe.name} - {elements.day_shortstr(recipe.days)}\n')
         s_file.write('\n')
         for group_name, food_list in shopping_groups.items():
@@ -456,4 +456,4 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
             s_file.write('\n')
     msg = f'File Created {output_file}'
     logger.info(msg)
-    return all_food, recipe_list
+    return all_food, used_recipes
