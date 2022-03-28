@@ -170,9 +170,15 @@ class MainWidget(QMainWindow):
         or possibly loadable from the output text results.
         """
         if not any(self._shopping_list):
-            QMessageBox.information(self,
+            generate_but = QPushButton('Generate')
+            generate_but.clicked.connect(self.make_shopping_list)
+            msg = 'Must have generated a sheet, generate one now?'
+            result = QMessageBox.information(self,
                 'Dynamic Sheet',
-                'Must have an active sheet back from generate list',)
+                msg,
+                QMessageBox.Yes | QMessageBox.Cancel)
+            if result == QMessageBox.Yes:
+                self.make_shopping_list(self.open_dynamic_sheet)
             return
         self.dynamic_sheet = DynamicSheet(
             self,
@@ -292,9 +298,15 @@ class MainWidget(QMainWindow):
                 yaml.dump(yml_dict, y_file, yaml.Dumper)
         return out_dir / file_name
 
-    def make_shopping_list(self):
+    def make_shopping_list(self, fn_callback=None):
         """
         Builds the shopping list when geenrate is chosen.
+
+        Parameters
+        ----------
+        fn_callback : func
+            If provided, will be called at the end of making
+            the shopping list.
         """
         ignored = already_have.get_ignored()
         self.build_string_monitor()
@@ -307,14 +319,14 @@ class MainWidget(QMainWindow):
         sheet_data = sheet_days.get_sheet_data(True)
         if self._threaded:
             self.shopping_worker = ShoppingWorker(
-                sheet_data, out_file, self.string_io, ignored)
+                sheet_data, out_file, self.string_io, ignored, fn_callback)
             self.shopping_worker.moveToThread(self.shop_thread)
             self.shopping_worker.finished.connect(self.all_done)
             self.shop_thread.started.connect(self.shopping_worker.run)
             self.shop_thread.start()
         else:
             food_items, recipes = shopping_list.main(sheet_data, out_file, self.string_io, ignored)
-            self.all_done(food_items, recipes)
+            self.all_done(food_items, recipes, fn_callback)
 
     def build_string_monitor(self):
         """
@@ -328,10 +340,19 @@ class MainWidget(QMainWindow):
         self.string_worker.string_changed.connect(self.update_status)
         self.mon_thread.start()
 
-    def all_done(self, food_items, recipes):
+    def all_done(self, food_items, recipes, fn_callback=None):
         """
         Close the string monitor and re-enable the list
         generator.
+
+        Parameters
+        ----------
+        food_items : dict
+            Dictionary of food items.
+        recipes : dict
+            Recipes.
+        fn_callback : func, optional, default=None
+            If provided will be the last thing called.
         """
         self._shopping_list = food_items
         self._recipes = recipes
@@ -342,3 +363,5 @@ class MainWidget(QMainWindow):
         self.shop_thread.quit()
         self.shop_thread.wait()
         self.generate_list_but.setEnabled(True)
+        if fn_callback:
+            fn_callback()

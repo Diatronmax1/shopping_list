@@ -56,16 +56,19 @@ class ShoppingWorker(QObject):
         String to monitor for changes.
     ignored : set
         A set of names that should be ignored.
+    fn_callback : func, optional, default=None
+        If provided will be passed through the finished signal.
     """
 
-    finished = pyqtSignal(dict, dict)
+    finished = pyqtSignal(dict, dict, 'PyQt_PyObject')
 
-    def __init__(self, sheet_names, out_file, string_io, ignored):
+    def __init__(self, sheet_names, out_file, string_io, ignored, fn_callback=None):
         super().__init__()
         self.sheet_names = sheet_names
         self.out_file = out_file
         self.string_io = string_io
         self.ignored = ignored
+        self.fn_callback = fn_callback
 
     def run(self):
         """
@@ -73,4 +76,4 @@ class ShoppingWorker(QObject):
         """
         food_items, recipes = shopping_list.main(
             self.sheet_names, self.out_file, self.string_io, self.ignored)
-        self.finished.emit(food_items, recipes)
+        self.finished.emit(food_items, recipes, self.fn_callback)
