@@ -45,7 +45,7 @@ class DynamicSheet(QDialog):
         super().__init__(parent)
         self.setWindowTitle('Dynamic Sheet')
         if os.name != 'nt':
-            msg.setWindowModality(Qt.WindowModal)
+            self.setWindowModality(Qt.WindowModal)
         self._scroll = QScrollArea()
         self.food_items = food_items
         self.recipes = recipes

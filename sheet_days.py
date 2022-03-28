@@ -109,7 +109,7 @@ class SheetDay(QDialog):
         super().__init__(parent)
         self.setWindowTitle(f'Editing {sheet_name}')
         if os.name != 'nt':
-            msg.setWindowModality(Qt.WindowModal)
+            self.setWindowModality(Qt.WindowModal)
         self.sheet_name = sheet_name
         self.sheets = get_sheet_data()
         self.current_sheet = self.sheets[self.sheet_name]
