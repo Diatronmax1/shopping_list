@@ -2,6 +2,7 @@
 Provides utility functions to maintain the current days in the file.
 """
 #pylint: disable=unspecified-encoding
+import io
 import datetime as dt
 from pathlib import Path
 
@@ -9,10 +10,11 @@ from oauth2client.service_account import ServiceAccountCredentials as sac
 
 import yaml
 
-
-CFG_PATH = Path('config.yml')
+CFG_PATH = Path.home() / 'shopping_list_cfg.yml'
 KEY_PATH = Path.home() / 'shopping_list_key.json'
 DAYS = {}
+LOG_STRING = io.StringIO()
+
 _sheet_names = (
     'Chris Food Plan',
     "Melia's Food Plan",

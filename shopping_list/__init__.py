@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
 """
-Main application window to create shopping lists from.
+A shopping list creator inspired by google sheets docs.
 """
-#pylint: disable=unspecified-encoding, invalid-name
+import sys
 from functools import partial
 import os
 import subprocess
@@ -9,6 +10,7 @@ from pathlib import Path
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QApplication,
     QAction,
     QButtonGroup,
     QCheckBox,
@@ -31,13 +33,13 @@ from PyQt5.QtGui import QTextCursor
 from PyQt5.QtCore import QThread
 import yaml
 
-import shopping_list
-import already_have
-from dynamic_sheet import DynamicSheet
-import sheet_days
-import core
-from core import DAYS, CFG_PATH, check_keyfile, change_keyfile
-from workers import StringMonitor, ShoppingWorker
+from shopping_list import (
+    already_have,
+    core,
+    sheet_days,
+    workers,
+)
+from shopping_list.dynamic_sheet import DynamicSheet
 
 class OptionalDisplay(QDialog):
     """
@@ -75,7 +77,7 @@ class MainWidget(QMainWindow):
     def __init__(self, string_io):
         super().__init__()
         self.setWindowTitle('Shopping List Creator')
-        with open(CFG_PATH, 'rb') as y_file:
+        with open(core.CFG_PATH, 'rb') as y_file:
             cfg_dict = yaml.load(y_file, yaml.Loader)
         self.already_haves = None
         self.dynamic_sheet = None
@@ -86,7 +88,7 @@ class MainWidget(QMainWindow):
         #Create button group for days.
         self.day_buttons = QButtonGroup()
         self.day_buttons.setExclusive(False)
-        for day in DAYS.values():
+        for day in core.DAYS.values():
             new_check = QCheckBox(day.strftime('%A (%m/%d)'), self)
             self.day_buttons.addButton(new_check)
         #Name of the file.
@@ -398,3 +400,27 @@ class MainWidget(QMainWindow):
         self.generate_list_but.setEnabled(True)
         if fn_callback:
             fn_callback()
+
+def main():
+    """
+    Will create the application then
+    return the exit status.
+
+    Parameters
+    ----------
+    log_capture_string : io.StringIO
+        A dynamic string that will contain
+        the logging output.
+
+    Returns
+    -------
+    int
+        Exit code.
+    """
+    main_app = QApplication(sys.argv)
+    window = app.MainWidget()
+    window.show()
+    window.check_for_keyfile()
+    ret_code = main_app.exec_()
+    core.LOG_STRING.close()
+    return main_app.exec_()
