@@ -41,7 +41,7 @@ class Food():
         self.name = name
         self.amount = amount
         self.rec_unit = rec_unit
-        self.food_type = food_type
+        self.food_type = food_type.lower()
         self.days = set()
 
     @classmethod

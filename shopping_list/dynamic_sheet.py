@@ -84,7 +84,9 @@ class DynamicSheet(QDialog):
             group_names.remove('No Category')
             group_names.append('No Category')
         for group_name in group_names:
-            food_group = QGroupBox(group_name)
+            #Modify the group names to always have uppercase first letter.
+            disp_name = group_name[0].upper() + group_name[1:]
+            food_group = QGroupBox(disp_name)
             layout = QVBoxLayout(food_group)
             food_list = QListWidget()
             layout.addWidget(food_list)
