@@ -7,7 +7,6 @@ import datetime as dt
 from pathlib import Path
 
 from oauth2client.service_account import ServiceAccountCredentials as sac
-
 import yaml
 
 CFG_PATH = Path.home() / 'shopping_list_cfg.yml'

@@ -4,21 +4,17 @@ on the sheets created on google drive for Food.
 """
 import copy
 import datetime as dt
-import os
-from pathlib import Path
 import logging
+from pathlib import Path
 
 import gspread
 import pandas as pd
 from pint import UnitRegistry
 
-import core
-import elements
-
-os.chdir(Path(__file__).parent)
+from shopping_list import core, elements
 
 UREG = UnitRegistry()
-UREG.load_definitions('unit_def.txt')
+UREG.load_definitions(str(Path(__file__).parent / 'unit_def.txt'))
 
 def load_food_plan(worksheet, used_days):
     """
@@ -378,7 +374,7 @@ def build_groups(food_items):
         groups[group].sort()
     return groups
 
-def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_have=None):
+def build(sheet_data, output_file='shopping_list.txt', already_have=None):
     """
     Retrieves data from a google spreadsheet and
     creates a shopping list from it.
@@ -398,8 +394,8 @@ def main(sheet_data, output_file='shopping_list.txt', string_io=None, already_ha
     """
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
-    if string_io and not logger.hasHandlers():
-        stream_handle = logging.StreamHandler(string_io)
+    if core.LOG_STRING and not logger.hasHandlers():
+        stream_handle = logging.StreamHandler(core.LOG_STRING)
         stream_handle.flush()
         stream_handle.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(levelname)s - %(message)s')

@@ -35,6 +35,7 @@ import yaml
 
 from shopping_list import (
     already_have,
+    builder,
     core,
     sheet_days,
     workers,
@@ -74,7 +75,7 @@ class MainWidget(QMainWindow):
 
     """
 
-    def __init__(self, string_io):
+    def __init__(self):
         super().__init__()
         self.setWindowTitle('Shopping List Creator')
         with open(core.CFG_PATH, 'rb') as y_file:
@@ -83,7 +84,6 @@ class MainWidget(QMainWindow):
         self.dynamic_sheet = None
         self._shopping_list = {}
         self._recipes = {}
-        self.string_io = string_io
         self.make_menu(cfg_dict)
         #Create button group for days.
         self.day_buttons = QButtonGroup()
@@ -254,7 +254,7 @@ class MainWidget(QMainWindow):
         if result == QMessageBox.Cancel:
             return
         #Find the relevant buttons by button name.
-        fmt_days = {day.strftime('%A (%m/%d)'):day.strftime("%A") for day in DAYS.values()}
+        fmt_days = {day.strftime('%A (%m/%d)'):day.strftime("%A") for day in core.DAYS.values()}
         update_days = set()
         use_all = True
         for button in self.day_buttons.buttons():
@@ -280,14 +280,14 @@ class MainWidget(QMainWindow):
         FileNotFoundError
             When the keyfile isn't setup correctly.
         """
-        if not check_keyfile():
+        if not core.check_keyfile():
             key_text, ok_pressed = QInputDialog.getText(self,
                 'No Key File detected, create new',
                 'Key:')
             if key_text and ok_pressed:
-                change_keyfile(key_text)
+                core.change_keyfile(key_text)
         #Now if it still doesn't exist, crash.
-        if not check_keyfile():
+        if not core.check_keyfile():
             raise FileNotFoundError('Must have a key file to continue!')
 
     def edit_already_haves(self):
@@ -323,11 +323,11 @@ class MainWidget(QMainWindow):
         file_name = Path(self.file_name.text()).with_suffix('.txt')
         out_dir = Path(self.output_dir.text())
         if save_cfg:
-            with open(CFG_PATH, 'rb') as y_file:
+            with open(core.CFG_PATH, 'rb') as y_file:
                 yml_dict = yaml.load(y_file, yaml.Loader)
                 yml_dict['filename'] = file_name.name
                 yml_dict['output_dir'] = out_dir.as_posix()
-            with open(CFG_PATH, 'w') as y_file:
+            with open(core.CFG_PATH, 'w') as y_file:
                 yaml.dump(yml_dict, y_file, yaml.Dumper)
         return out_dir / file_name
 
@@ -341,7 +341,7 @@ class MainWidget(QMainWindow):
             If provided, will be called at the end of making
             the shopping list.
         """
-        with open(CFG_PATH, 'rb') as y_file:
+        with open(core.CFG_PATH, 'rb') as y_file:
             cfg_dict = yaml.load(y_file, yaml.Loader)
         ignored = already_have.get_ignored()
         self.build_string_monitor()
@@ -353,14 +353,14 @@ class MainWidget(QMainWindow):
         self.shop_thread = QThread()
         sheet_data = sheet_days.get_sheet_data(True)
         if cfg_dict['threaded']:
-            self.shopping_worker = ShoppingWorker(
-                sheet_data, out_file, self.string_io, ignored, fn_callback)
+            self.shopping_worker = workers.ShoppingWorker(
+                sheet_data, out_file, ignored, fn_callback)
             self.shopping_worker.moveToThread(self.shop_thread)
             self.shopping_worker.finished.connect(self.all_done)
             self.shop_thread.started.connect(self.shopping_worker.run)
             self.shop_thread.start()
         else:
-            food_items, recipes = shopping_list.main(sheet_data, out_file, self.string_io, ignored)
+            food_items, recipes = builder.build(sheet_data, out_file, ignored)
             self.all_done(food_items, recipes, fn_callback)
 
     def build_string_monitor(self):
@@ -369,7 +369,7 @@ class MainWidget(QMainWindow):
         and sets it to the log string.
         """
         self.mon_thread = QThread()
-        self.string_worker = StringMonitor(self.string_io)
+        self.string_worker = workers.StringMonitor()
         self.string_worker.moveToThread(self.mon_thread)
         self.mon_thread.started.connect(self.string_worker.run)
         self.string_worker.string_changed.connect(self.update_status)
@@ -418,9 +418,9 @@ def main():
         Exit code.
     """
     main_app = QApplication(sys.argv)
-    window = app.MainWidget()
+    window = MainWidget()
     window.show()
     window.check_for_keyfile()
     ret_code = main_app.exec_()
     core.LOG_STRING.close()
-    return main_app.exec_()
+    return ret_code

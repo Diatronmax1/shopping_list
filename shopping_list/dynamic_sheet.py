@@ -22,9 +22,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-import core
-from already_have import write_names, get_names
-from shopping_list import build_groups
+from shopping_list import core
+from shopping_list.already_have import write_names, get_names
+from shopping_list.builder import build_groups
 
 class DynamicSheet(QDialog):
     """

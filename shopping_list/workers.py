@@ -6,7 +6,7 @@ import time
 
 from PyQt5.QtCore import pyqtSignal, QObject
 
-import shopping_list
+from shopping_list import builder, core
 
 class StringMonitor(QObject):
     """
@@ -20,11 +20,10 @@ class StringMonitor(QObject):
 
     string_changed = pyqtSignal(str)
 
-    def __init__(self, monitor_str):
+    def __init__(self):
         super().__init__()
-        self.monitor_str = monitor_str
         self.alive = True
-        self.cur_len = len(self.monitor_str.getvalue())
+        self.cur_len = len(core.LOG_STRING.getvalue())
 
     def run(self):
         """
@@ -33,10 +32,10 @@ class StringMonitor(QObject):
         """
         while self.alive:
             time.sleep(0.5)
-            if self.monitor_str.closed:
+            if core.LOG_STRING.closed:
                 self.alive = False
                 break
-            value = self.monitor_str.getvalue()
+            value = core.LOG_STRING.getvalue()
             if value != self.cur_len:
                 self.string_changed.emit(value)
                 self.cur_len = value
@@ -62,11 +61,10 @@ class ShoppingWorker(QObject):
 
     finished = pyqtSignal(dict, dict, 'PyQt_PyObject')
 
-    def __init__(self, sheet_names, out_file, string_io, ignored, fn_callback=None):
+    def __init__(self, sheet_names, out_file, ignored, fn_callback=None):
         super().__init__()
         self.sheet_names = sheet_names
         self.out_file = out_file
-        self.string_io = string_io
         self.ignored = ignored
         self.fn_callback = fn_callback
 
@@ -74,6 +72,6 @@ class ShoppingWorker(QObject):
         """
         Builds the shopping list on a thread.
         """
-        food_items, recipes = shopping_list.main(
-            self.sheet_names, self.out_file, self.string_io, self.ignored)
+        food_items, recipes = builder.build(
+            self.sheet_names, self.out_file, self.ignored)
         self.finished.emit(food_items, recipes, self.fn_callback)
