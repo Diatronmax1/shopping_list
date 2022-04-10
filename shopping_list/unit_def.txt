@@ -12,3 +12,4 @@ sprig = [sprig] = _ = _
 link = [link] = _ = links
 package = [package] = _ = _
 bulb = [bulb] = _ = _
+loaf = [loaf] = _ = loaves
