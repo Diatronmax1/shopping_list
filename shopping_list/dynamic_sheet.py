@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from shopping_list import core
+import shopping_list
 from shopping_list.already_have import write_names, get_names
 from shopping_list.builder import build_groups
 
@@ -115,7 +115,7 @@ class DynamicSheet(QDialog):
         close_but = QPushButton('Close')
         close_but.clicked.connect(self.accept)
         main_layout.addWidget(close_but)
-        if core.get_bool('mobile'):
+        if shopping_list.get_bool('mobile'):
             self.resize(parent.size())
 
     def double_click_recipe(self, item):

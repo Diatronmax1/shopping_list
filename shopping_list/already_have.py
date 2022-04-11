@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import (
 )
 import yaml
 
-from shopping_list.core import CFG_PATH
+from shopping_list import CFG_PATH
 
 def write_names(names):
     """

@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
 )
 import yaml
 
-from shopping_list.core import CFG_PATH, DAYS
+from shopping_list import CFG_PATH, DAYS
 
 def get_sheets():
     """

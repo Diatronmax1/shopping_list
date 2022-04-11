@@ -11,7 +11,8 @@ import gspread
 import pandas as pd
 from pint import UnitRegistry
 
-from shopping_list import core, elements
+import shopping_list
+from shopping_list import elements
 
 UREG = UnitRegistry()
 UREG.load_definitions(str(Path(__file__).parent / 'unit_def.txt'))
@@ -394,15 +395,15 @@ def build(sheet_data, output_file='shopping_list.txt', already_have=None):
     """
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
-    if core.LOG_STRING and not logger.hasHandlers():
-        stream_handle = logging.StreamHandler(core.LOG_STRING)
+    if shopping_list.LOG_STRING and not logger.hasHandlers():
+        stream_handle = logging.StreamHandler(shopping_list.LOG_STRING)
         stream_handle.flush()
         stream_handle.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(levelname)s - %(message)s')
         stream_handle.setFormatter(formatter)
         logger.addHandler(stream_handle)
     
-    google_sheets = gspread.authorize(core.get_credentials())
+    google_sheets = gspread.authorize(shopping_list.get_credentials())
     days = {}
     for name, used_days in sheet_data.items():
         msg = f'Grabbing food from {name}'

@@ -6,7 +6,8 @@ import time
 
 from PyQt5.QtCore import pyqtSignal, QObject
 
-from shopping_list import builder, core
+import shopping_list
+from shopping_list import builder
 
 class StringMonitor(QObject):
     """
@@ -23,7 +24,7 @@ class StringMonitor(QObject):
     def __init__(self):
         super().__init__()
         self.alive = True
-        self.cur_len = len(core.LOG_STRING.getvalue())
+        self.cur_len = len(shopping_list.LOG_STRING.getvalue())
 
     def run(self):
         """
@@ -32,10 +33,10 @@ class StringMonitor(QObject):
         """
         while self.alive:
             time.sleep(0.5)
-            if core.LOG_STRING.closed:
+            if shopping_list.LOG_STRING.closed:
                 self.alive = False
                 break
-            value = core.LOG_STRING.getvalue()
+            value = shopping_list.LOG_STRING.getvalue()
             if value != self.cur_len:
                 self.string_changed.emit(value)
                 self.cur_len = value
