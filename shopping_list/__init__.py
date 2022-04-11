@@ -16,6 +16,8 @@ KEY_PATH = Path.home() / 'shopping_list_key.json'
 DAYS = {}
 LOG_STRING = io.StringIO()
 
+SHEET_COLS = {chr(ord('A') + x):x for x in range(26)}
+
 _sheet_names = (
     'Chris Food Plan',
     "Melia's Food Plan",

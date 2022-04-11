@@ -4,6 +4,7 @@ with items that we want for the sheet.
 """
 
 from pint import DimensionalityError
+from shopping_list import SHEET_COLS
 
 def day_shortstr(days, fmt='%a'):
     """
@@ -66,11 +67,11 @@ class Food():
         Food
             The created food item.
         """
-        name = series[0]
-        qty_str = series[4]
-        food_unit = series[5]
-        grams_str = series[6]
-        food_type = series[11]
+        name = series[SHEET_COLS['A']]
+        qty_str = series[SHEET_COLS['F']]
+        food_unit = series[SHEET_COLS['G']]
+        grams_str = series[SHEET_COLS['H']]
+        food_type = series[SHEET_COLS['M']]
         try:
             food_qty = float(qty_str)
         except ValueError as exc1:

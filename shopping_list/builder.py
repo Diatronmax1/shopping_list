@@ -12,7 +12,8 @@ import pandas as pd
 from pint import UnitRegistry
 
 import shopping_list
-from shopping_list import elements
+from shopping_list import SHEET_COLS, LOG_STRING
+from shopping_list.elements import Recipe, Food, ChosenItem
 
 UREG = UnitRegistry()
 UREG.load_definitions(str(Path(__file__).parent / 'unit_def.txt'))
@@ -71,26 +72,27 @@ def build_food_from_days(user_days):
         'Differences'
         )
     items = {}
+    #Aliasing numbers to values to help.
     for sheet_name, days in user_days.items():
         for day, food_sheet in days.items():
             for row, food_row in food_sheet.iterrows():
                 log_msg = f'{sheet_name} - {day} - row {row} -'
-                name = food_row[0]
-                qty_str = food_row[1]
+                name = food_row[SHEET_COLS['A']]
+                qty_str = food_row[SHEET_COLS['B']]
                 if name == '' or qty_str == '':
                     continue
                 if name in ignored_rows:
                     continue
                 try:
                     qty = float(qty_str)
-                    unit_type = food_row[2]
-                    serv_weight_as_grams = food_row[11]
+                    unit_type = food_row[SHEET_COLS['C']]
+                    serv_weight_as_grams = food_row[SHEET_COLS['N']]
                 except KeyError as key_exc:
                     msg = f'{log_msg} Failed to retrieve values {key_exc}'
                     logger.warning(msg)
                     continue
                 except ValueError:
-                    msg = f'{log_msg} Unable to convert qty {food_row[1]}'
+                    msg = f'{log_msg} Unable to convert qty {qty_str}'
                     logger.warning(msg)
                     continue
                 #Gurantees Item is available.
@@ -98,7 +100,7 @@ def build_food_from_days(user_days):
                     new_item = False
                     item = items.get(name)
                     if item is None:
-                        item = elements.ChosenItem(name)
+                        item = ChosenItem(name)
                         new_item = True
                     item.sheets.add(sheet_name)
                     item.days.add(day)
@@ -142,8 +144,9 @@ def load_recipes(recipe_df, raw_df):
     cur_recipe = None
     start_track = False
     recipes = {}
+    #Aliasing numbers to values to help.
     for idx, series in recipe_df.iterrows():
-        first_col = series[0]
+        first_col = series[SHEET_COLS['A']]
         if first_col == 'Name':
             #Stop tracking if you encounter name again.
             start_track = False
@@ -151,30 +154,30 @@ def load_recipes(recipe_df, raw_df):
             if cur_recipe:
                 recipes[recipe_name] = cur_recipe
             recipe_series = recipe_df.iloc[idx+1]
-            recipe_name = recipe_series[0]
-            rec_per_serv = float(recipe_series[6])
-            cur_recipe = elements.Recipe(recipe_name, rec_per_serv)
+            recipe_name = recipe_series[SHEET_COLS['A']]
+            rec_per_serv = float(recipe_series[SHEET_COLS['H']])
+            cur_recipe = Recipe(recipe_name, rec_per_serv)
         if start_track:
             if first_col:
                 raw_ing_series = raw_df.loc[first_col]
                 ing_name = raw_ing_series['Name']
                 serv_str = raw_ing_series['Serving Qty']
-                amt_str = series[8]
+                num_serv_str = series[SHEET_COLS['J']]
                 try:
                     serv_qty = float(serv_str)
                     #Grab the qty from the recipe.
-                    serv_amt = float(amt_str)
+                    num_servings = float(num_serv_str)
                 except ValueError:
-                    msg = f'Failed to convert {serv_str} or {amt_str} on {ing_name}'
+                    msg = f'Failed to convert {serv_str} or {num_serv_str} on {ing_name}'
                     logger.warning(msg)
                     continue
                 serv_unit = raw_ing_series['Serving Unit']
                 amount = serv_qty * UREG(serv_unit)
                 #Grab the preferred unit from the recipe.
-                rec_unit = series[2]
+                rec_unit = series[SHEET_COLS['C']]
                 food_type = raw_ing_series['Food Type']
-                new_food = elements.Food(ing_name, amount, rec_unit, food_type)
-                new_food *= serv_amt
+                new_food = Food(ing_name, amount, rec_unit, food_type)
+                new_food *= num_servings
                 cur_recipe.append(new_food)
         #So the next time in the loop we will look for ingredient names.
         if cur_recipe and first_col == 'Ingredients':
@@ -326,7 +329,7 @@ def create_shopping_list(items, master_df, recipes, already_have):
         total_g = chosen_item.total_grams()
         total_s = chosen_item.total_servings()
         try:
-            new_food = elements.Food.from_masterlist(master_series, total_g, UREG)
+            new_food = Food.from_masterlist(master_series, total_g, UREG)
         except ValueError:
             msg = f'Failed to convert {chosen_name} from master list'
             logger.exception(chosen_item.exc_str(msg))
@@ -395,8 +398,8 @@ def build(sheet_data, output_file='shopping_list.txt', already_have=None):
     """
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
-    if shopping_list.LOG_STRING and not logger.hasHandlers():
-        stream_handle = logging.StreamHandler(shopping_list.LOG_STRING)
+    if LOG_STRING and not logger.hasHandlers():
+        stream_handle = logging.StreamHandler(LOG_STRING)
         stream_handle.flush()
         stream_handle.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(levelname)s - %(message)s')
