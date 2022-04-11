@@ -107,10 +107,8 @@ class MainWidget(QMainWindow):
         #Contains sheet names and sets.
         self.generate_list_but = QPushButton('Generate List')
         self.generate_list_but.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        apply_all_but = QPushButton('Apply To All Sheets')
         #Signals
         self.generate_list_but.clicked.connect(self.make_shopping_list)
-        apply_all_but.clicked.connect(self.update_all_sheet_data)
         #Layout
         day_group = QGroupBox('Days')
         if cfg_dict['mobile']:
@@ -119,8 +117,9 @@ class MainWidget(QMainWindow):
             layout = QHBoxLayout(day_group)
         for button in self.day_buttons.buttons():
             button.setChecked(True)
+            #Connect its signal after.
+            button.stateChanged.connect(self.update_all_sheet_data)
             layout.addWidget(button)
-        layout.addWidget(apply_all_but)
         sheet_group = QGroupBox('Sheets')
         layout = QVBoxLayout(sheet_group)
         self.sheet_day_buttons = QButtonGroup()
@@ -244,15 +243,6 @@ class MainWidget(QMainWindow):
         Casts all data from the main gui to each sheet name in the
         configuration.
         """
-        result = QMessageBox.information(
-            self,
-            'Update All',
-            'Warning this will update all current user sheet days!',
-            QMessageBox.Ok | QMessageBox.Cancel,
-            QMessageBox.Ok
-            )
-        if result == QMessageBox.Cancel:
-            return
         #Find the relevant buttons by button name.
         fmt_days = {day.strftime('%A (%m/%d)'):day.strftime("%A") for day in shopping_list.DAYS.values()}
         update_days = set()
