@@ -13,7 +13,7 @@ from pint import UnitRegistry
 
 import shopping_list
 from shopping_list import SHEET_COLS, LOG_STRING
-from shopping_list.elements import Recipe, Food, ChosenItem
+from shopping_list.elements import Recipe, Food, ChosenItem, day_shortstr
 
 UREG = UnitRegistry()
 UREG.load_definitions(str(Path(__file__).parent / 'unit_def.txt'))
@@ -446,14 +446,16 @@ def build(sheet_data, output_file='shopping_list.txt', already_have=None):
         s_file.write(f'{rec_header}\n')
         s_file.write(f"{'-'*len(rec_header)}\n")
         for recipe in used_recipes.values():
-            s_file.write(f' - {recipe.name} - {elements.day_shortstr(recipe.days)}\n')
+            s_file.write(f' - {recipe.name} - {day_shortstr(recipe.days)}\n')
         s_file.write('\n')
         group_names = sorted(shopping_groups)
         if 'No Category' in group_names:
             group_names.remove('No Category')
             group_names.append('No Category')
         for group_name in group_names:
-            s_file.write(group_name + '\n')
+            #Make the first char upper case.
+            group_title = group_name[0].upper() + group_name[1:]
+            s_file.write(group_title + '\n')
             s_file.write('-'*len(group_name) + '\n')
             for food_item in shopping_groups[group_name]:
                 s_file.write(f'{food_item}\n')
