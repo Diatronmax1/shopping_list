@@ -121,16 +121,25 @@ class MainWidget(QMainWindow):
             button.stateChanged.connect(self.update_all_sheet_data)
             layout.addWidget(button)
         sheet_group = QGroupBox('Sheets')
-        layout = QVBoxLayout(sheet_group)
+        sheet_layout = QVBoxLayout(sheet_group)
         self.sheet_day_buttons = QButtonGroup()
         self.sheet_day_buttons.setExclusive(False)
         for sheet_name, button_name in sheet_days.sheets_with_daystrings().items():
             new_button = QPushButton(button_name)
-            #For now just manually settting it, bad practice maybe.
-            new_button.sheet_name = sheet_name
+            on_off_but = QPushButton('On/Off')
+            on_off_but.setCheckable(True)
+            if 'full' in button_name:
+                on_off_but.setChecked(True)
+            on_off_but.setObjectName(button_name)
+            on_off_but.clicked.connect(partial(self.update_full_sheet, sheet_name, on_off_but))
             new_button.clicked.connect(partial(self.edit_sheet_data, new_button, sheet_name))
+            new_button.sheet_name = sheet_name
             self.sheet_day_buttons.addButton(new_button)
-            layout.addWidget(new_button)
+            but_wid = QWidget()
+            button_layout = QHBoxLayout(but_wid)
+            button_layout.addWidget(new_button)
+            button_layout.addWidget(on_off_but)
+            sheet_layout.addWidget(but_wid)
         #Main
         stat_line = QWidget()
         s_layout = QHBoxLayout(stat_line)
@@ -238,6 +247,17 @@ class MainWidget(QMainWindow):
         dialog.update_name.connect(button.setText)
         dialog.open()
 
+    def update_full_sheet(self, sheet_name, check_button):
+        """When a reset button is pressed, set the sheet state to the new state."""
+        if check_button.isChecked():
+            used_days = set([day.strftime('%A') for day in shopping_list.DAYS.values()])
+        else:
+            used_days = set()
+        sheet_days.update_named_sheet_data(sheet_name, used_days)
+        day_strings = sheet_days.sheets_with_daystrings()
+        for button in self.sheet_day_buttons.buttons():
+            button.setText(day_strings[button.sheet_name])
+
     def update_all_sheet_data(self):
         """
         Casts all data from the main gui to each sheet name in the
@@ -246,14 +266,9 @@ class MainWidget(QMainWindow):
         #Find the relevant buttons by button name.
         fmt_days = {day.strftime('%A (%m/%d)'):day.strftime("%A") for day in shopping_list.DAYS.values()}
         update_days = set()
-        use_all = True
         for button in self.day_buttons.buttons():
             if button.isChecked():
                 update_days.add(fmt_days[button.text()])
-            else:
-                use_all = False
-        if use_all:
-            update_days.clear()
         #Now go over each sheet and reset their data.
         sheet_days.update_all_sheet_data(update_days)
         #Then go update all the button names.
@@ -341,7 +356,7 @@ class MainWidget(QMainWindow):
             self.status.setText(f'Output dir {out_file.parent} does not exist!')
             return
         self.shop_thread = QThread()
-        sheet_data = sheet_days.get_sheet_data(True)
+        sheet_data = sheet_days.get_sheet_data()
         if cfg_dict['threaded']:
             self.shopping_worker = workers.ShoppingWorker(
                 sheet_data, out_file, ignored, fn_callback)
