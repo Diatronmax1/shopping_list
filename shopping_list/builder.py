@@ -162,7 +162,7 @@ def load_recipes(recipe_df, raw_df):
                 raw_ing_series = raw_df.loc[first_col]
                 ing_name = raw_ing_series['Name']
                 serv_str = raw_ing_series['Serving Qty']
-                num_serv_str = series[SHEET_COLS['J']]
+                num_serv_str = series[SHEET_COLS['L']]
                 try:
                     serv_qty = float(serv_str)
                     #Grab the qty from the recipe.
@@ -409,6 +409,8 @@ def build(sheet_data, output_file='shopping_list.txt', already_have=None):
     google_sheets = gspread.authorize(shopping_list.get_credentials())
     days = {}
     for name, used_days in sheet_data.items():
+        if not any(used_days):
+            continue
         msg = f'Grabbing food from {name}'
         logger.info(msg)
         try:
