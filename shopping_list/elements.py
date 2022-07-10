@@ -92,8 +92,8 @@ class Food():
         =======
         str
         """
-        if self.food_type == 'Meat':
-            return day_shortstr(self.days, '%m/%d')
+        if self.food_type.lower() in ('meat', 'dairy'):
+            return day_shortstr(self.days, '%d')
         return day_shortstr(self.days)
 
     def __str__(self):
