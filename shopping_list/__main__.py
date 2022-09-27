@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (
     QDialog,
     QGroupBox,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -80,7 +81,8 @@ class MainWidget(QMainWindow):
         self.setWindowTitle('Shopping List Creator')
         with open(shopping_list.CFG_PATH, 'rb') as y_file:
             cfg_dict = yaml.load(y_file, yaml.Loader)
-        self.already_haves = None
+        self.wid_already_haves = None
+        self.wid_sheet_names = None
         self.dynamic_sheet = None
         self._shopping_list = {}
         self._recipes = {}
@@ -120,10 +122,48 @@ class MainWidget(QMainWindow):
             #Connect its signal after.
             button.stateChanged.connect(self.update_all_sheet_data)
             layout.addWidget(button)
-        sheet_group = QGroupBox('Sheets')
-        sheet_layout = QVBoxLayout(sheet_group)
         self.sheet_day_buttons = QButtonGroup()
         self.sheet_day_buttons.setExclusive(False)
+        self.sheet_group = QGroupBox('Sheets')
+        sheet_layout = QVBoxLayout(self.sheet_group)
+        self.create_sheet_widgets(sheet_layout)
+        #Main
+        stat_line = QWidget()
+        s_layout = QHBoxLayout(stat_line)
+        s_layout.addWidget(QLabel('Status'))
+        s_layout.addWidget(self.generate_list_but)
+        file_line = QWidget()
+        layout = QFormLayout(file_line)
+        layout.addRow('File name', self.file_name)
+        layout.addRow('Output Directory', self.output_dir)
+        #Main Layout
+        central_widget = QWidget()
+        layout = QVBoxLayout(central_widget)
+        layout.addWidget(day_group)
+        layout.addWidget(self.sheet_group)
+        layout.addWidget(file_line)
+        layout.addWidget(stat_line)
+        layout.addWidget(self.status)
+        #Set main.
+        self.setCentralWidget(central_widget)
+
+    def reset_sheet_group_layout(self):
+        """Resets the sheets layout if renamed."""
+        sheet_layout = self.sheet_group.layout()
+        #Remove all widgets.
+        for _ in range(sheet_layout.count()):
+            item = sheet_layout.takeAt(0)
+            item.widget().setParent(None)
+        self.create_sheet_widgets(sheet_layout)
+
+    def create_sheet_widgets(self, sheet_layout):
+        """Builds the widgets for each sheet from the cfg file.
+
+        Returns
+        -------
+        QGroupBox
+            The widget to add to the layout.
+        """
         for sheet_name, button_name in sheet_days.sheets_with_daystrings().items():
             new_button = QPushButton(button_name)
             on_off_but = QPushButton('On/Off')
@@ -140,25 +180,6 @@ class MainWidget(QMainWindow):
             button_layout.addWidget(new_button)
             button_layout.addWidget(on_off_but)
             sheet_layout.addWidget(but_wid)
-        #Main
-        stat_line = QWidget()
-        s_layout = QHBoxLayout(stat_line)
-        s_layout.addWidget(QLabel('Status'))
-        s_layout.addWidget(self.generate_list_but)
-        file_line = QWidget()
-        layout = QFormLayout(file_line)
-        layout.addRow('File name', self.file_name)
-        layout.addRow('Output Directory', self.output_dir)
-        #Main Layout
-        central_widget = QWidget()
-        layout = QVBoxLayout(central_widget)
-        layout.addWidget(day_group)
-        layout.addWidget(sheet_group)
-        layout.addWidget(file_line)
-        layout.addWidget(stat_line)
-        layout.addWidget(self.status)
-        #Set main.
-        self.setCentralWidget(central_widget)
 
     def make_menu(self, cfg_dict):
         """
@@ -179,6 +200,8 @@ class MainWidget(QMainWindow):
         already_have_act = QAction('Already Haves', self)
         edit_menu = self.menuBar().addMenu('Edit')
         edit_menu.addAction(already_have_act)
+        sheet_act = QAction('Sheets', self)
+        edit_menu.addAction(sheet_act)
         #Developer Options
         threaded_act = QAction('Threaded', self)
         threaded_act.setCheckable(True)
@@ -193,6 +216,7 @@ class MainWidget(QMainWindow):
         open_sheet_act.triggered.connect(self.open_shopping_list)
         open_dynamic_sheet_act.triggered.connect(self.open_dynamic_sheet)
         already_have_act.triggered.connect(self.edit_already_haves)
+        sheet_act.triggered.connect(self.edit_sheets)
         threaded_act.toggled.connect(partial(shopping_list.change_bool, 'threaded', threaded_act))
         mobile_act.toggled.connect(partial(shopping_list.change_bool, 'mobile', mobile_act))
 
@@ -299,8 +323,13 @@ class MainWidget(QMainWindow):
         """
         Creates the widget to modify already haves.
         """
-        self.already_haves = already_have.AlreadyHave(self)
-        self.already_haves.open()
+        self.wid_already_haves = already_have.AlreadyHave(self)
+        self.wid_already_haves.open()
+
+    def edit_sheets(self):
+        """Creates a widget to modify sheet names."""
+        self.wid_sheet_names = sheet_days.SheetNames(self)
+        self.wid_sheet_names.open()
 
     def update_status(self, new_value):
         """
