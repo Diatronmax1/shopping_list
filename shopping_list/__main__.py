@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -87,12 +88,6 @@ class MainWidget(QMainWindow):
         self._shopping_list = {}
         self._recipes = {}
         self.make_menu(cfg_dict)
-        #Create button group for days.
-        self.day_buttons = QButtonGroup()
-        self.day_buttons.setExclusive(False)
-        for day in shopping_list.DAYS.values():
-            new_check = QCheckBox(day.strftime('%A (%m/%d)'), self)
-            self.day_buttons.addButton(new_check)
         #Name of the file.
         self.file_name = QLineEdit()
         self.file_name.setText(cfg_dict['filename'])
@@ -112,20 +107,10 @@ class MainWidget(QMainWindow):
         #Signals
         self.generate_list_but.clicked.connect(self.make_shopping_list)
         #Layout
-        day_group = QGroupBox('Days')
-        if cfg_dict['mobile']:
-            layout = QVBoxLayout(day_group)
-        else:
-            layout = QHBoxLayout(day_group)
-        for button in self.day_buttons.buttons():
-            button.setChecked(True)
-            #Connect its signal after.
-            button.stateChanged.connect(self.update_all_sheet_data)
-            layout.addWidget(button)
         self.sheet_day_buttons = QButtonGroup()
         self.sheet_day_buttons.setExclusive(False)
         self.sheet_group = QGroupBox('Sheets')
-        sheet_layout = QVBoxLayout(self.sheet_group)
+        sheet_layout = QGridLayout(self.sheet_group)
         self.create_sheet_widgets(sheet_layout)
         #Main
         stat_line = QWidget()
@@ -139,7 +124,6 @@ class MainWidget(QMainWindow):
         #Main Layout
         central_widget = QWidget()
         layout = QVBoxLayout(central_widget)
-        layout.addWidget(day_group)
         layout.addWidget(self.sheet_group)
         layout.addWidget(file_line)
         layout.addWidget(stat_line)
@@ -159,27 +143,42 @@ class MainWidget(QMainWindow):
     def create_sheet_widgets(self, sheet_layout):
         """Builds the widgets for each sheet from the cfg file.
 
+        Parameters
+        ----------
+        sheet_layout: QGridLayout
+            A grid layout to apply the widgets to.
+
         Returns
         -------
         QGroupBox
             The widget to add to the layout.
         """
-        for sheet_name, button_name in sheet_days.sheets_with_daystrings().items():
+        start_name = ''
+        cur_col = 0
+        day_dict = sheet_days.sheets_with_daystrings()
+        if len(day_dict) == 0:
+            return
+        first_name = list(day_dict.keys())[0]
+        if len(first_name) > 5:
+            start_name = first_name[:5]
+        row = 0
+        for sheet_name, button_name in day_dict.items():
             new_button = QPushButton(button_name)
-            on_off_but = QPushButton('On/Off')
-            on_off_but.setCheckable(True)
-            if 'full' in button_name:
-                on_off_but.setChecked(True)
-            on_off_but.setObjectName(button_name)
-            on_off_but.clicked.connect(partial(self.update_full_sheet, sheet_name, on_off_but))
-            new_button.clicked.connect(partial(self.edit_sheet_data, new_button, sheet_name))
+            new_button.setCheckable(True)
+            new_button.setContextMenuPolicy(Qt.CustomContextMenu)
+            new_button.clicked.connect(partial(self.update_full_sheet, sheet_name, new_button))
+            new_button.customContextMenuRequested.connect(partial(self.edit_sheet_data, new_button, sheet_name))
             new_button.sheet_name = sheet_name
             self.sheet_day_buttons.addButton(new_button)
             but_wid = QWidget()
             button_layout = QHBoxLayout(but_wid)
             button_layout.addWidget(new_button)
-            button_layout.addWidget(on_off_but)
-            sheet_layout.addWidget(but_wid)
+            if len(sheet_name) > 5 and start_name != sheet_name[:5]:
+                cur_col += 1
+                start_name = sheet_name[:5]
+                row = 0
+            sheet_layout.addWidget(but_wid, row, cur_col)
+            row += 1
 
     def make_menu(self, cfg_dict):
         """
@@ -278,24 +277,6 @@ class MainWidget(QMainWindow):
         else:
             used_days = set()
         sheet_days.update_named_sheet_data(sheet_name, used_days)
-        day_strings = sheet_days.sheets_with_daystrings()
-        for button in self.sheet_day_buttons.buttons():
-            button.setText(day_strings[button.sheet_name])
-
-    def update_all_sheet_data(self):
-        """
-        Casts all data from the main gui to each sheet name in the
-        configuration.
-        """
-        #Find the relevant buttons by button name.
-        fmt_days = {day.strftime('%A (%m/%d)'):day.strftime("%A") for day in shopping_list.DAYS.values()}
-        update_days = set()
-        for button in self.day_buttons.buttons():
-            if button.isChecked():
-                update_days.add(fmt_days[button.text()])
-        #Now go over each sheet and reset their data.
-        sheet_days.update_all_sheet_data(update_days)
-        #Then go update all the button names.
         day_strings = sheet_days.sheets_with_daystrings()
         for button in self.sheet_day_buttons.buttons():
             button.setText(day_strings[button.sheet_name])

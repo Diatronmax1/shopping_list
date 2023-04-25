@@ -105,28 +105,6 @@ def update_named_sheet_data(sheet_name, used_days):
     with open(CFG_PATH, 'w') as y_file:
         yaml.dump(yml_dict, y_file, yaml.Dumper)
 
-def update_all_sheet_data(used_days):
-    """
-    Casts to the config file all of the used_days, or
-    if use All, clears the config data.
-
-    Parameters
-    ----------
-    used_days : set
-        The datetimes of the days to use.
-    use_all : bool
-        Whether or not all days should be used.
-    """
-    sheets = get_sheet_data()
-    for sheet_name in sheets:
-        sheets[sheet_name] = list(used_days)
-    #Now convert for writing.
-    with open(CFG_PATH, 'r') as y_file:
-        yml_dict = yaml.load(y_file, yaml.Loader)
-        yml_dict['sheets'] = sheets
-    with open(CFG_PATH, 'w') as y_file:
-        yaml.dump(yml_dict, y_file, yaml.Dumper)
-
 class SheetNames(QDialog):
     """
     Widget that allows manipulation of the underlying

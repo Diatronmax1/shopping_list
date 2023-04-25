@@ -415,10 +415,11 @@ def build(sheet_data, output_file='shopping_list.txt', already_have=None):
         logger.info(msg)
         try:
             sheet = google_sheets.open(name)
-        except gspread.exceptions.APIError:
+        except Exception as exc:
+            print(exc)
             msg = f'Unable to open {name}!'
             logger.exception(msg)
-            return False
+            continue
         days[name] = load_food_plan(sheet, used_days)
     logger.info('Grabbing master food list')
     master_df, recipes = load_food_list(google_sheets.open('Food List'))
