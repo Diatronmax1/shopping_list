@@ -214,7 +214,7 @@ def load_food_list(wks):
         elif title == 'recipes':
             data = sheet.get_all_values()
             recipe_df = pd.DataFrame(data)
-        elif title == 'raw ingredients':
+        elif title == 'base foods':
             data = sheet.get_all_values()
             header = data.pop(0)
             raw_df = pd.DataFrame(data, columns=header)
@@ -226,7 +226,7 @@ def load_food_list(wks):
         logger.exception('Missing recipe dataframe')
         return None, {}
     if raw_df is None:
-        logger.exception('Missing Raw Ingredient dataframe.')
+        logger.exception('Missing base foods dataframe.')
         return None, {}
     recipes = load_recipes(recipe_df, raw_df)
     return master_df, recipes
@@ -372,7 +372,8 @@ def build_groups(food_items):
         if food_item.food_type not in groups:
             groups[food_item.food_type] = []
         groups[food_item.food_type].append(food_item)
-    groups['No Category'] = no_group
+    if any(no_group):
+        groups['No Category'] = no_group
     #Sort the groups
     for group in groups:
         groups[group].sort()

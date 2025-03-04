@@ -130,6 +130,7 @@ class MainWidget(QMainWindow):
         layout.addWidget(self.status)
         #Set main.
         self.setCentralWidget(central_widget)
+        self.resize(550, self.height())
 
     def reset_sheet_group_layout(self):
         """Resets the sheets layout if renamed."""
@@ -155,30 +156,43 @@ class MainWidget(QMainWindow):
         """
         start_name = ''
         cur_col = 0
-        day_dict = sheet_days.sheets_with_daystrings()
-        if len(day_dict) == 0:
+        sheet_names = sheet_days.get_sheets()
+        print(sheet_names)
+        if len(sheet_names) == 0:
             return
-        first_name = list(day_dict.keys())[0]
+        first_name = sheet_names[0]
         if len(first_name) > 5:
             start_name = first_name[:5]
         row = 0
-        for sheet_name, button_name in day_dict.items():
-            new_button = QPushButton(button_name)
-            new_button.setCheckable(True)
-            new_button.setContextMenuPolicy(Qt.CustomContextMenu)
-            new_button.clicked.connect(partial(self.update_full_sheet, sheet_name, new_button))
-            new_button.customContextMenuRequested.connect(partial(self.edit_sheet_data, new_button, sheet_name))
-            new_button.sheet_name = sheet_name
-            self.sheet_day_buttons.addButton(new_button)
-            but_wid = QWidget()
-            button_layout = QHBoxLayout(but_wid)
-            button_layout.addWidget(new_button)
+        for sheet_name in sheet_names:
+            new_box = QGroupBox(sheet_name)
+            but_layout = QHBoxLayout(new_box)
+            all_button = QPushButton('All')
+            all_button.setCheckable(True)
+            all_button.setMaximumWidth(40)
+            day_group = QButtonGroup(new_box)
+            day_group.setExclusive(False)
+            day_group.addButton(all_button)
+            but_layout.addWidget(all_button)
+            day_group.buttonToggled.connect(self.check_button_state)
+            for day, day_time in shopping_list.DAYS.items():
+                new_button = QPushButton(day_time.strftime('%a'))
+                new_button.setCheckable(True)
+                day_group.addButton(new_button)
+                new_button.setMaximumWidth(40)
+                but_layout.addWidget(new_button)
             if len(sheet_name) > 5 and start_name != sheet_name[:5]:
                 cur_col += 1
                 start_name = sheet_name[:5]
                 row = 0
-            sheet_layout.addWidget(but_wid, row, cur_col)
+            sheet_layout.addWidget(new_box, row, cur_col)
             row += 1
+
+    def check_button_state(self, button, checked):
+        if button.text() == 'All':
+            for other_button in button.group().buttons():
+                if other_button.text() != 'All':
+                    other_button.setChecked(checked)
 
     def make_menu(self, cfg_dict):
         """
@@ -261,26 +275,6 @@ class MainWidget(QMainWindow):
             self._recipes)
         self.dynamic_sheet.open()
 
-    def edit_sheet_data(self, button, sheet_name):
-        """
-        Called when a button is pressed in the GUI spawns
-        the sheet editor.
-        """
-        dialog = sheet_days.SheetDay(self, sheet_name)
-        dialog.update_name.connect(button.setText)
-        dialog.open()
-
-    def update_full_sheet(self, sheet_name, check_button):
-        """When a reset button is pressed, set the sheet state to the new state."""
-        if check_button.isChecked():
-            used_days = set([day.strftime('%A') for day in shopping_list.DAYS.values()])
-        else:
-            used_days = set()
-        sheet_days.update_named_sheet_data(sheet_name, used_days)
-        day_strings = sheet_days.sheets_with_daystrings()
-        for button in self.sheet_day_buttons.buttons():
-            button.setText(day_strings[button.sheet_name])
-
     def check_for_keyfile(self):
         """
         Validates there is a key to connect to sheets.
@@ -356,6 +350,24 @@ class MainWidget(QMainWindow):
             If provided, will be called at the end of making
             the shopping list.
         """
+        sheet_data = {}
+        short_names = {day.strftime('%a'):day for day in shopping_list.DAYS.values()}
+        for index in range(self.sheet_group.layout().count()):
+            group_box = self.sheet_group.layout().itemAt(index).widget()
+            sheet_name = group_box.title()
+            temp_set = set()
+            for index2 in range(group_box.layout().count()):
+                day_item = group_box.layout().itemAt(index2).widget()
+                if day_item.isChecked():
+                    if day_item.text() == 'All':
+                        temp_set.clear()
+                        temp_set.update(shopping_list.DAYS.values())
+                        break
+                    else:
+                        temp_set.add(short_names[day_item.text()])
+            if any(temp_set):
+                sheet_data[sheet_name] = temp_set
+
         with open(shopping_list.CFG_PATH, 'rb') as y_file:
             cfg_dict = yaml.load(y_file, yaml.Loader)
         ignored = already_have.get_ignored()
@@ -366,7 +378,6 @@ class MainWidget(QMainWindow):
             self.status.setText(f'Output dir {out_file.parent} does not exist!')
             return
         self.shop_thread = QThread()
-        sheet_data = sheet_days.get_sheet_data()
         if cfg_dict['threaded']:
             self.shopping_worker = workers.ShoppingWorker(
                 sheet_data, out_file, ignored, fn_callback)

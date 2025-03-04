@@ -19,13 +19,18 @@ LOG_STRING = io.StringIO()
 SHEET_COLS = {chr(ord('A') + x):x for x in range(26)}
 
 _sheet_names = (
-    'Chris Food Plan',
-    "Melia's Food Plan",
-    "Bryn's Food Plan"
+    'Chris Week 1',
+    'Chris Week 2',
+    'Chris Week 3',
+    'Chris Week 4',
+    "Melia's Food Plan Week 1",
+    "Melia's Food Plan Week 2",
+    "Melia's Food Plan Week 3",
+    "Melia's Food Plan Week 4",
 )
 DEFAULTS = {
     'names': {},
-    'sheets' : {name:None for name in _sheet_names},
+    'sheets' : _sheet_names,
     'threaded':True,
     'filename':'shopping_list',
     'output_dir': '~/Desktop',
