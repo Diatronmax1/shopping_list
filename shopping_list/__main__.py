@@ -157,7 +157,6 @@ class MainWidget(QMainWindow):
         start_name = ''
         cur_col = 0
         sheet_names = sheet_days.get_sheets()
-        print(sheet_names)
         if len(sheet_names) == 0:
             return
         first_name = sheet_names[0]
@@ -175,7 +174,7 @@ class MainWidget(QMainWindow):
             day_group.addButton(all_button)
             but_layout.addWidget(all_button)
             day_group.buttonToggled.connect(self.check_button_state)
-            for day, day_time in shopping_list.DAYS.items():
+            for day_time in shopping_list.DAYS.values():
                 new_button = QPushButton(day_time.strftime('%a'))
                 new_button.setCheckable(True)
                 day_group.addButton(new_button)
