@@ -46,7 +46,7 @@ def load_food_plan(worksheet, used_days):
             days[sheet_day] = pd.DataFrame(data)
     return days
 
-def build_food_from_days(user_days):
+def build_food_from_days(user_days, cur_logger):
     """
     Retrieves data for each chosen item by day.
 
@@ -60,7 +60,6 @@ def build_food_from_days(user_days):
     dict
         Dictionary by days of extracted data.
     """
-    logger = logging.getLogger(__name__)
     ignored_rows = (
         'Breakfast',
         'Lunch',
@@ -73,15 +72,22 @@ def build_food_from_days(user_days):
         )
     items = {}
     #Aliasing numbers to values to help.
+    skip_monday_lunch = False
     for sheet_name, days in user_days.items():
         for day, food_sheet in days.items():
+            cur_day = day.strftime('%a')
             for row, food_row in food_sheet.iterrows():
                 log_msg = f'{sheet_name} - {day} - row {row} -'
                 name = food_row[SHEET_COLS['A']]
                 qty_str = food_row[SHEET_COLS['B']]
+                if cur_day == 'Mon':
+                    if name == 'Lunch':
+                        skip_monday_lunch = True
+                    elif name == 'Snack':
+                        skip_monday_lunch = False
                 if name == '' or qty_str == '':
                     continue
-                if name in ignored_rows:
+                if skip_monday_lunch:
                     continue
                 try:
                     qty = float(qty_str)
@@ -89,11 +95,11 @@ def build_food_from_days(user_days):
                     serv_weight_as_grams = food_row[SHEET_COLS['N']]
                 except KeyError as key_exc:
                     msg = f'{log_msg} Failed to retrieve values {key_exc}'
-                    logger.warning(msg)
+                    cur_logger.warning(msg)
                     continue
                 except ValueError:
                     msg = f'{log_msg} Unable to convert qty {qty_str}'
-                    logger.warning(msg)
+                    cur_logger.warning(msg)
                     continue
                 #Gurantees Item is available.
                 if name and qty:
@@ -111,14 +117,14 @@ def build_food_from_days(user_days):
                             serv_weight_as_grams = float(serv_weight_as_grams)
                         except ValueError:
                             msg = f'Failed to convert {name} serv_weight (g) {serv_weight_as_grams}'
-                            logger.exception(item.exc_str(msg))
+                            cur_logger.exception(item.exc_str(msg))
                             continue
                         item.add_grams(qty, serv_weight_as_grams)
                     elif unit_type == 'servings':
                         item.add_servings(qty)
                     else:
                         msg = f'Unrecognized unit_type {unit_type} for {name}'
-                        logger.warning(item.exc_str(msg))
+                        cur_loggerr.warning(item.exc_str(msg))
                         continue
                     if new_item:
                         items[name] = item
@@ -425,7 +431,8 @@ def build(sheet_data, output_file='shopping_list.txt', already_have=None):
     logger.info('Grabbing master food list')
     master_df, recipes = load_food_list(google_sheets.open('Food List'))
     logger.info('Combining food sheets')
-    food_by_day = build_food_from_days(days)
+    logger.info(days)
+    food_by_day = build_food_from_days(days, logger)
     logger.info('Creating the food list')
     all_food, used_recipes = create_shopping_list(food_by_day, master_df, recipes, already_have)
     shopping_groups = build_groups(all_food)
