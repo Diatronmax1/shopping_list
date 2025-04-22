@@ -171,9 +171,9 @@ class MainWidget(QMainWindow):
             all_button.setMaximumWidth(40)
             day_group = QButtonGroup(new_box)
             day_group.setExclusive(False)
-            day_group.addButton(all_button)
+            day_group.addButton(all_button, 1)
             but_layout.addWidget(all_button)
-            day_group.buttonToggled.connect(self.check_button_state)
+            day_group.buttonClicked.connect(self.check_button_state)
             for day_time in shopping_list.DAYS.values():
                 new_button = QPushButton(day_time.strftime('%a'))
                 new_button.setCheckable(True)
@@ -187,11 +187,16 @@ class MainWidget(QMainWindow):
             sheet_layout.addWidget(new_box, row, cur_col)
             row += 1
 
-    def check_button_state(self, button, checked):
-        if button.text() == 'All':
-            for other_button in button.group().buttons():
-                if other_button.text() != 'All':
-                    other_button.setChecked(checked)
+    def check_button_state(self, clicked_button):
+        checked = clicked_button.isChecked()
+        button_group = clicked_button.group()
+        if clicked_button.text() == 'All':
+            for button in button_group.buttons():
+                if button.text() != 'All':
+                    button.setChecked(checked)
+        elif not checked:
+            all_button = button_group.button(1)
+            all_button.setChecked(False)
 
     def make_menu(self, cfg_dict):
         """
