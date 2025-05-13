@@ -13,11 +13,9 @@ from PyQt5.QtWidgets import (
     QApplication,
     QAction,
     QButtonGroup,
-    QCheckBox,
     QDialog,
     QGroupBox,
     QFormLayout,
-    QFrame,
     QGridLayout,
     QHBoxLayout,
     QInputDialog,
@@ -355,6 +353,7 @@ class MainWidget(QMainWindow):
             the shopping list.
         """
         sheet_data = {}
+        shopping_list.build_days()
         short_names = {day.strftime('%a'):day for day in shopping_list.DAYS.values()}
         for index in range(self.sheet_group.layout().count()):
             group_box = self.sheet_group.layout().itemAt(index).widget()

@@ -60,16 +60,6 @@ def build_food_from_days(user_days, cur_logger):
     dict
         Dictionary by days of extracted data.
     """
-    ignored_rows = (
-        'Breakfast',
-        'Lunch',
-        'Snack',
-        'Dinner',
-        'Desert',
-        'Stick To',
-        'Totals',
-        'Differences'
-        )
     items = {}
     #Aliasing numbers to values to help.
     skip_monday_lunch = False
@@ -124,7 +114,7 @@ def build_food_from_days(user_days, cur_logger):
                         item.add_servings(qty)
                     else:
                         msg = f'Unrecognized unit_type {unit_type} for {name}'
-                        cur_loggerr.warning(item.exc_str(msg))
+                        cur_logger.warning(item.exc_str(msg))
                         continue
                     if new_item:
                         items[name] = item
@@ -431,7 +421,6 @@ def build(sheet_data, output_file='shopping_list.txt', already_have=None):
     logger.info('Grabbing master food list')
     master_df, recipes = load_food_list(google_sheets.open('Food List'))
     logger.info('Combining food sheets')
-    logger.info(days)
     food_by_day = build_food_from_days(days, logger)
     logger.info('Creating the food list')
     all_food, used_recipes = create_shopping_list(food_by_day, master_df, recipes, already_have)
